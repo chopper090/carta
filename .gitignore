@@ -1,0 +1,22 @@
+# Claude / dev tooling
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Dependencies / build
+node_modules/
+dist/
+build/
+
+# Backup / temp
+*.bak
+*.tmp

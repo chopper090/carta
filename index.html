@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Carta · Generatore di menu</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1A1A18">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Carta">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!-- Disabilita le estensioni tipo "Dark Reader" che invertono i colori a forza -->
+<meta name="darkreader-lock">
+<!-- Applica il tema salvato prima del primo paint (niente flash) -->
+<script>(function(){try{var t=localStorage.getItem('ui.theme')||'light';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
+<!-- Service worker + auto-aggiornamento PWA -->
+<script>
+if('serviceWorker' in navigator){
+  addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      reg.addEventListener('updatefound',function(){
+        var nw=reg.installing; if(!nw) return;
+        nw.addEventListener('statechange',function(){
+          if(nw.state==='activated' && navigator.serviceWorker.controller) location.reload();
+        });
+      });
+    }).catch(function(){});
+  });
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Poppins:ital,wght@0,300;0,400;1,300;1,400&family=Noto+Serif+JP:wght@200;300;400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<!-- Font del cliente "il baretto" (Cocktail & Wine Bar) — precaricati per evitare il flash sui titoli Bebas -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=GFS+Didot&family=Jost:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="menu-generator.css">
+<template id="__bundler_thumbnail">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#F5EDD8"/>
+  <line x1="20" y1="30" x2="80" y2="30" stroke="#C4A86A" stroke-width="0.6"/>
+  <text x="50" y="58" text-anchor="middle" font-family="Palatino, serif" font-style="italic" font-size="20" fill="#1A1A18">Carta</text>
+  <line x1="35" y1="70" x2="65" y2="70" stroke="#C4A86A" stroke-width="0.4"/>
+  <text x="50" y="80" text-anchor="middle" font-family="monospace" font-size="4" letter-spacing="0.5" fill="#8C8880">GENERATORE DI MENU</text>
+</svg>
+</template>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="clients.js"></script>
+<script src="menu-data.js"></script>
+<script type="text/babel" src="menu-sheets.jsx"></script>
+<script type="text/babel" src="menu-form.jsx"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ---- client-aware loaders ----
+function readClientFromURL(){
+  try{
+    const p = new URLSearchParams(location.search).get("client");
+    if (p && CLIENTS[p]) return p;
+  } catch(e){}
+  return null;
+}
+function loadMenuFor(clientId){
+  try{
+    let saved = localStorage.getItem("menu." + clientId);
+    // migrazione dalle vecchie chiavi (solo casa)
+    if (!saved && clientId === "dalentini") saved = localStorage.getItem("dalentini.menu");
+    if (saved) return normalizeMenu(JSON.parse(saved));
+  } catch(e){}
+  const cl = getClient(clientId);
+  const key = cl.defaultPreset;
+  if (key && PRESET_MENUS[key]) return JSON.parse(JSON.stringify(PRESET_MENUS[key]));
+  return JSON.parse(JSON.stringify(EMPTY_MENU));
+}
+function loadVariantFor(clientId){
+  return localStorage.getItem("variant." + clientId)
+      || (clientId === "dalentini" && localStorage.getItem("dalentini.variant"))
+      || "contemporaneo";
+}
+
+function App(){
+  // ---- state ----
+  const [clientId, setClientId] = useState(() =>
+    readClientFromURL() || localStorage.getItem("active.client") || DEFAULT_CLIENT);
+  const client = getClient(clientId);
+
+  const [menu, setMenu] = useState(() => loadMenuFor(clientId));
+  const [variant, setVariant] = useState(() => loadVariantFor(clientId));
+
+  const SHEETS = {
+    classico: MenuClassico,
+    contemporaneo: MenuContemporaneo,
+    tabula: MenuTabula,
+    editoriale: MenuEditoriale,
+    diario: MenuDiario
+  };
+  const VLABELS = {
+    classico: "I · Classico",
+    contemporaneo: "II · Contemporaneo",
+    tabula: "III · Tabula",
+    editoriale: "IV · Editoriale",
+    diario: "V · Diario"
+  };
+  const SheetComponent = SHEETS[variant] || MenuContemporaneo;
+  const [zoom, setZoom] = useState(0.55);
+  const previewRef = useRef(null);
+
+  // ---- tema chiaro/scuro (default: chiaro) + vista mobile (editor/anteprima) ----
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem("ui.theme") || "light"; } catch(e){ return "light"; }
+  });
+  const [mview, setMview] = useState("editor");
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    try { localStorage.setItem("ui.theme", theme); } catch(e){}
+  }, [theme]);
+
+  // ---- client: font + url + persistenza attivo ----
+  useEffect(() => {
+    applyClientFonts(client);
+    try{ localStorage.setItem("active.client", clientId); } catch(e){}
+    try{
+      const url = new URL(location.href);
+      url.searchParams.set("client", clientId);
+      history.replaceState(null, "", url);
+    } catch(e){}
+  }, [clientId]);
+
+  // ---- persistence (per cliente) ----
+  useEffect(() => {
+    try{ localStorage.setItem("menu." + clientId, JSON.stringify(menu)); } catch(e){}
+  }, [menu, clientId]);
+  useEffect(() => {
+    try{ localStorage.setItem("variant." + clientId, variant); } catch(e){}
+  }, [variant, clientId]);
+
+  // ---- switch client → carica il suo menù + variante ----
+  const switchClient = useCallback((id) => {
+    if (!CLIENTS[id] || id === clientId) return;
+    setMenu(loadMenuFor(id));
+    setVariant(loadVariantFor(id));
+    setClientId(id);
+  }, [clientId]);
+
+  // ---- preview auto-fit ----
+  const fitZoom = useCallback(() => {
+    const pane = previewRef.current;
+    if (!pane) return;
+    const avail = pane.clientWidth - 96;          // larghezza pannello meno padding
+    if (avail <= 0) return;                        // pannello nascosto (mobile): non ricalcolare
+    const a4w = 210 * 3.7795275591;                // A4 = 210mm ≈ 793px @96dpi
+    const target = Math.min(1, avail / a4w);
+    setZoom(Math.max(0.3, Math.min(1, Math.round(target * 100) / 100)));
+  }, []);
+  useEffect(() => {
+    fitZoom();
+    window.addEventListener("resize", fitZoom);
+    return () => window.removeEventListener("resize", fitZoom);
+  }, [fitZoom]);
+  // ricalcola quando l'anteprima torna visibile (mobile) o cambia variante
+  useEffect(() => { fitZoom(); }, [mview, variant, fitZoom]);
+
+  // ---- layout drag&drop (copertina) ----
+  const setLayoutOffset = useCallback((id, off) => {
+    setMenu(m => {
+      const layout = { ...(m.layout || {}) };
+      const cur = { ...(layout[variant] || {}) };
+      if (!off || (off.x === 0 && off.y === 0)) delete cur[id]; else cur[id] = off;
+      layout[variant] = cur;
+      return { ...m, layout };
+    });
+  }, [variant]);
+  const dragValue = { editable: true, zoom, onCommit: setLayoutOffset };
+  const hasLayout = !!(menu.layout && menu.layout[variant] && Object.keys(menu.layout[variant]).length);
+  const resetLayout = () => {
+    setMenu(m => {
+      const layout = { ...(m.layout || {}) };
+      delete layout[variant];
+      return { ...m, layout };
+    });
+  };
+
+  // ---- actions ----
+  const loadPreset = (key) => {
+    if (PRESET_MENUS[key]) setMenu(JSON.parse(JSON.stringify(PRESET_MENUS[key])));
+  };
+  const resetMenu = () => {
+    if (confirm("Sostituire il menù corrente con un menu vuoto?")){
+      setMenu(JSON.parse(JSON.stringify(EMPTY_MENU)));
+    }
+  };
+  const exportMenu = (kind) => {
+    const prefix = client.id;
+    if (kind === "json"){
+      const blob = new Blob([JSON.stringify(menu, null, 2)], { type: "application/json" });
+      downloadBlob(blob, `${prefix}-${slug(menu.name)}.json`);
+    } else if (kind === "html"){
+      const html = buildStandaloneHTML(menu, variant, clientId);
+      const blob = new Blob([html], { type: "text/html" });
+      downloadBlob(blob, `${prefix}-${slug(menu.name)}.html`);
+    }
+  };
+  const printMenu = () => window.print();
+
+  const zoomIn = () => setZoom(z => Math.min(1, Math.round((z + 0.05) * 100) / 100));
+  const zoomOut = () => setZoom(z => Math.max(0.3, Math.round((z - 0.05) * 100) / 100));
+
+  return (
+    <div className="app" data-client={clientId} data-mview={mview}>
+      <Form
+        menu={menu}
+        setMenu={setMenu}
+        variant={variant}
+        setVariant={setVariant}
+        client={client}
+        setClient={switchClient}
+        onLoadPreset={loadPreset}
+        onReset={resetMenu}
+        onPrint={printMenu}
+        onExport={exportMenu}
+      />
+      <div className="preview-pane" ref={previewRef} data-client={clientId}>
+        <div className="preview-toolbar">
+          <div className="ptb-dot"></div>
+          <span className="ptb-hide-sm">Anteprima A4 · 210 × 297 mm</span>
+          <div className="ptb-spacer ptb-hide-sm"></div>
+          <span>{client.name} · {VLABELS[variant]}</span>
+          <div className="ptb-spacer"></div>
+          {hasLayout && (
+            <button className="ptb-theme" onClick={resetLayout}
+              title="Reimposta le posizioni della copertina" aria-label="Reimposta posizioni copertina">⤺</button>
+          )}
+          <button
+            className="ptb-theme"
+            onClick={() => setTheme(t => (t === "light" ? "dark" : "light"))}
+            title={theme === "light" ? "Menù scuro (a schermo)" : "Menù chiaro"}
+            aria-label={theme === "light" ? "Passa al menù scuro" : "Passa al menù chiaro"}>
+            {theme === "light" ? "☾" : "☀"}
+          </button>
+          <div className="ptb-spacer"></div>
+          <div className="ptb-zoom">
+            <button onClick={zoomOut} title="Riduci zoom" aria-label="Riduci zoom">−</button>
+            <span className="z-val">{Math.round(zoom * 100)}%</span>
+            <button onClick={zoomIn} title="Aumenta zoom" aria-label="Aumenta zoom">+</button>
+          </div>
+        </div>
+        <div className="sheet-stack" style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}>
+          <DragCtx.Provider value={dragValue}>
+            <SheetComponent menu={menu} client={client} />
+          </DragCtx.Provider>
+        </div>
+      </div>
+      <div className="drag-guide-layer" id="dragGuideLayer" aria-hidden="true"></div>
+
+      <nav className="mobile-tabs" aria-label="Sezioni">
+        <button className={"mobile-tab " + (mview === "editor" ? "active" : "")}
+          onClick={() => setMview("editor")} aria-pressed={mview === "editor"}>✎ Editor</button>
+        <button className={"mobile-tab " + (mview === "preview" ? "active" : "")}
+          onClick={() => setMview("preview")} aria-pressed={mview === "preview"}>▭ Anteprima</button>
+      </nav>
+    </div>
+  );
+}
+
+// ---- utility ----
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function slug(s){
+  return (s || "menu")
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+function buildStandaloneHTML(menu, variant, clientId){
+  const cl = getClient(clientId);
+  const clientFonts = cl.fonts ? `\n<link href="${cl.fonts}" rel="stylesheet">` : "";
+  return `<!DOCTYPE html>
+<html lang="it" data-theme="light"><head><meta charset="UTF-8">
+<title>${menu.name} · ${cl.name}</title>
+<meta name="color-scheme" content="light"><meta name="darkreader-lock">
+<link href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Poppins:ital,wght@0,300;0,400;1,300;1,400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">${clientFonts}
+<link rel="stylesheet" href="menu-generator.css">
+<style>body{background:white;overflow:visible;height:auto}#root{display:block;height:auto}.sheet{transform:none}.page-A4{margin:0 auto 24px;box-shadow:0 8px 24px rgba(0,0,0,.12)}@media print{.page-A4{box-shadow:none;page-break-after:always;page-break-inside:avoid}.page-A4:last-child{page-break-after:avoid}}</style>
+</head><body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"><\/script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"><\/script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"><\/script>
+<script src="clients.js"><\/script>
+<script src="menu-data.js"><\/script>
+<script type="text/babel" src="menu-sheets.jsx"><\/script>
+<script type="text/babel">
+const MENU = ${JSON.stringify(menu, null, 2)};
+const CLIENT = getClient(${JSON.stringify(clientId)});
+const SheetMap = { classico: MenuClassico, contemporaneo: MenuContemporaneo, tabula: MenuTabula, editoriale: MenuEditoriale, diario: MenuDiario };
+const Sheet = SheetMap[${JSON.stringify(variant)}] || MenuContemporaneo;
+ReactDOM.createRoot(document.getElementById("root")).render(<Sheet menu={MENU} client={CLIENT} />);
+<\/script>
+</body></html>`;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
