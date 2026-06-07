@@ -1727,7 +1727,7 @@ body{
     size: A4 portrait;
     margin: 0;
   }
-  html, body{ overflow: visible; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body{ overflow: visible; background: white; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .form-panel, .preview-toolbar, .mobile-tabs, .app > .preview-pane > .sheet-stack > .sheet > *:not(.page-A4){
     display: none !important;
   }
@@ -1754,11 +1754,13 @@ body{
   .page-A4{
     box-shadow: none;
     border: none;
+    box-sizing: border-box;
     page-break-after: always;
     page-break-inside: avoid;
     margin: 0 auto;            /* centrata sul foglio */
     width: 210mm;
-    height: 297mm;
+    height: 296mm;             /* 296 (non 297) → evita l'overflow di 1px che crea pagine vuote extra */
+    overflow: hidden;          /* contiene eventuali sbordi → niente pagine in più */
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact; /* stampa gli sfondi colorati (bande sezione, ecc.) */
   }
