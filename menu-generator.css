@@ -2171,3 +2171,37 @@ body{
   .draggable.editable{ cursor: default; outline: none !important; }
   .drag-guide-layer{ display: none !important; }
 }
+
+/* ============================================================
+   INTESTAZIONI DI SEZIONE  (Antipasti, Buns, Piatti, Signature…)
+   Valgono in tutte le 5 varianti. Colore via currentColor →
+   si adatta al tema di ogni cliente (oro DaLentini, blu baretto…).
+   ============================================================ */
+.menu-section{
+  display: flex; align-items: center; gap: 12px;
+  margin: 22px 0 12px;
+  break-inside: avoid; page-break-inside: avoid;
+}
+.menu-section .ms-rule{
+  flex: 1 1 auto; height: 1px;
+  background: color-mix(in srgb, currentColor 22%, transparent);
+}
+.menu-section .ms-label{
+  flex: 0 0 auto;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10.5px; letter-spacing: .26em; text-transform: uppercase;
+  white-space: nowrap;
+  color: color-mix(in srgb, currentColor 78%, transparent);
+}
+/* II Contemporaneo · V Diario: etichetta a sinistra (niente filetto prima) */
+.sheet-contemporaneo .ms-m .ms-rule:first-child,
+.sheet-diario .ms-dr .ms-rule:first-child{ display: none; }
+/* III Tabula: più compatta */
+.sheet-tabula .menu-section{ margin: 16px 0 9px; }
+/* IV Editoriale: intestazione a tutta larghezza */
+.sheet-editoriale .menu-section{ grid-column: 1 / -1; width: 100%; margin: 10px 0 2px; }
+/* V Diario: corsivo serif, in tono col racconto */
+.sheet-diario .ms-label{
+  font-family: var(--f-serif, 'Cormorant Garamond', serif);
+  font-style: italic; text-transform: none; letter-spacing: .05em; font-size: 15px;
+}

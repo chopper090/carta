@@ -20,6 +20,7 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
     .map(id => CLIENTS[id]).filter(Boolean);
   const C = client || (typeof getClient === "function" ? getClient(DEFAULT_CLIENT) : null);
   const presets = (C && C.presets) || [];
+  const sectionNames = [...new Set((menu.dishes || []).map(d => d.section).filter(Boolean))];
 
   const updateField = (field, value) => {
     setMenu(prev => ({ ...prev, [field]: value }));
@@ -48,7 +49,7 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
   const addDish = () => {
     setMenu(prev => ({
       ...prev,
-      dishes: [...prev.dishes, { name: "", desc: "", story: "", image: null, price: null, allergens: [] }]
+      dishes: [...prev.dishes, { name: "", section: "", desc: "", story: "", image: null, price: null, allergens: [] }]
     }));
   };
 
@@ -192,9 +193,9 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
             <span className="field-label">Prezzo fisso (€)</span>
             <input
               type="number"
-              value={menu.price}
-              onChange={e => updateField("price", Number(e.target.value))}
-              placeholder="65" />
+              value={menu.price ?? ""}
+              onChange={e => updateField("price", e.target.value === "" ? null : Number(e.target.value))}
+              placeholder="opzionale" />
           </label>
           <label className="field">
             <span className="field-label">Data serata</span>
@@ -241,6 +242,9 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
           {!isNarrative && !isImage && <span className="hint-pill hint-muted">Variante essenziale</span>}
         </div>
 
+        <datalist id="sezioni-list">
+          {sectionNames.map(s => <option key={s} value={s} />)}
+        </datalist>
         <div className="dishes-form">
           {menu.dishes.map((d, i) => (
             <DishEditor
@@ -309,6 +313,19 @@ function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAl
           <button className="ctrl-btn ctrl-x" disabled={total <= 1} onClick={onRemove} title="Rimuovi portata" aria-label="Rimuovi la portata">×</button>
         </div>
       </div>
+
+      <label className="field">
+        <span className="field-label">
+          Sezione
+          <span className="field-flag">opzionale · es. Antipasti, Buns, Piatti</span>
+        </span>
+        <input
+          type="text"
+          list="sezioni-list"
+          value={dish.section || ""}
+          onChange={e => onChange("section", e.target.value)}
+          placeholder="Antipasti, Buns, Piatti…" />
+      </label>
 
       <label className="field">
         <span className="field-label">Nome piatto</span>

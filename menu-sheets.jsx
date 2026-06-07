@@ -140,6 +140,20 @@ const formatPrice = (p) => {
 
 const courseNumber = (i) => String(i + 1).padStart(2, "0");
 
+// Una "sezione" inizia al piatto i se ha section non vuota e diversa dal precedente
+const startsSection = (dishes, i) => {
+  const s = dishes[i] && dishes[i].section;
+  return !!s && (i === 0 || (dishes[i - 1] && dishes[i - 1].section) !== s);
+};
+// Intestazione di sezione (Antipasti, Buns, …) — stile per-variante via classe ms-<variante>
+const SectionHead = ({ title, variant }) => (
+  <div className={"menu-section ms-" + variant}>
+    <span className="ms-rule" aria-hidden="true"></span>
+    <span className="ms-label">{title}</span>
+    <span className="ms-rule" aria-hidden="true"></span>
+  </div>
+);
+
 // Cliente attivo, con fallback alla casa
 const useClient = (client) =>
   client || (typeof getClient === "function" ? getClient(DEFAULT_CLIENT) : { id: "demo", name: "Il Tuo Ristorante", role: "", stamp: "Ristorante", stampInline: "Il Tuo Ristorante", diaryTitle: "Le nostre serate", logo: { type: "wordmark", text: "Il Tuo Ristorante" } });
@@ -269,20 +283,23 @@ function MenuClassico({ menu, client }) {
 
         <div className="dishes-c">
           {menu.dishes.map((d, i) => (
-            <div className="dish-c" key={i}>
-              <div className="dish-num-c">{courseNumber(i)}</div>
-              <h3 className="dish-name-c">
-                {d.name || <span className="placeholder-c">Nome del piatto</span>}
-                <DishPrice value={d.price} />
-                <AllergensInline list={d.allergens} />
-              </h3>
-              {d.desc && <p className="dish-desc-c">{d.desc}</p>}
-              {i < menu.dishes.length - 1 && (
-                <div className="dish-sep-c">
-                  <span></span><em>·</em><span></span>
-                </div>
-              )}
-            </div>
+            <React.Fragment key={i}>
+              {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="c" />}
+              <div className="dish-c">
+                <div className="dish-num-c">{courseNumber(i)}</div>
+                <h3 className="dish-name-c">
+                  {d.name || <span className="placeholder-c">Nome del piatto</span>}
+                  <DishPrice value={d.price} />
+                  <AllergensInline list={d.allergens} />
+                </h3>
+                {d.desc && <p className="dish-desc-c">{d.desc}</p>}
+                {i < menu.dishes.length - 1 && !startsSection(menu.dishes, i + 1) && (
+                  <div className="dish-sep-c">
+                    <span></span><em>·</em><span></span>
+                  </div>
+                )}
+              </div>
+            </React.Fragment>
           ))}
         </div>
 
@@ -360,19 +377,22 @@ function MenuContemporaneo({ menu, client }) {
 
         <div className="dishes-m">
           {menu.dishes.map((d, i) => (
-            <div className="dish-m" key={i}>
-              <div className="dish-left-m">
-                <div className="dish-num-m">{courseNumber(i)}</div>
+            <React.Fragment key={i}>
+              {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="m" />}
+              <div className="dish-m">
+                <div className="dish-left-m">
+                  <div className="dish-num-m">{courseNumber(i)}</div>
+                </div>
+                <div className="dish-body-m">
+                  <h3 className="dish-name-m">
+                    {d.name || <span className="placeholder-m">Nome del piatto</span>}
+                    <DishPrice value={d.price} />
+                    <AllergensInline list={d.allergens} />
+                  </h3>
+                  {d.desc && <p className="dish-desc-m">{d.desc}</p>}
+                </div>
               </div>
-              <div className="dish-body-m">
-                <h3 className="dish-name-m">
-                  {d.name || <span className="placeholder-m">Nome del piatto</span>}
-                  <DishPrice value={d.price} />
-                  <AllergensInline list={d.allergens} />
-                </h3>
-                {d.desc && <p className="dish-desc-m">{d.desc}</p>}
-              </div>
-            </div>
+            </React.Fragment>
           ))}
         </div>
 
@@ -420,15 +440,18 @@ function MenuTabula({ menu, client }) {
 
         <div className="tab-dishes">
           {menu.dishes.map((d, i) => (
-            <div className="tab-dish" key={i}>
-              <h3 className="tab-dish-name">
-                {d.name || <span className="placeholder-m">Nome del piatto</span>}
-                <DishPrice value={d.price} />
-                <AllergensInline list={d.allergens} />
-              </h3>
-              {d.desc && <div className="tab-dish-desc">{d.desc}</div>}
-              {i < menu.dishes.length - 1 && <div className="tab-sep"></div>}
-            </div>
+            <React.Fragment key={i}>
+              {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="t" />}
+              <div className="tab-dish">
+                <h3 className="tab-dish-name">
+                  {d.name || <span className="placeholder-m">Nome del piatto</span>}
+                  <DishPrice value={d.price} />
+                  <AllergensInline list={d.allergens} />
+                </h3>
+                {d.desc && <div className="tab-dish-desc">{d.desc}</div>}
+                {i < menu.dishes.length - 1 && !startsSection(menu.dishes, i + 1) && <div className="tab-sep"></div>}
+              </div>
+            </React.Fragment>
           ))}
         </div>
 
@@ -501,7 +524,9 @@ function MenuEditoriale({ menu, client }) {
             {group.map((d, idx) => {
               const i = pIdx * 2 + idx;
               return (
-                <article className="ed-dish" key={i}>
+                <React.Fragment key={i}>
+                {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="ed" />}
+                <article className="ed-dish">
                   <DishImage
                     src={d.image}
                     ratio="4 / 5"
@@ -529,6 +554,7 @@ function MenuEditoriale({ menu, client }) {
                     )}
                   </div>
                 </article>
+                </React.Fragment>
               );
             })}
           </div>
@@ -600,7 +626,9 @@ function MenuDiario({ menu, client }) {
             {group.map((d, idx) => {
               const i = pIdx * perPage + idx;
               return (
-                <article className="dr-entry" key={i}>
+                <React.Fragment key={i}>
+                {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="dr" />}
+                <article className="dr-entry">
                   <div className="dr-entry-num">{courseNumber(i)}</div>
                   <div className="dr-entry-body">
                     <h3 className="dr-entry-name">
@@ -612,6 +640,7 @@ function MenuDiario({ menu, client }) {
                     {d.story && <p className="dr-entry-story">{d.story}</p>}
                   </div>
                 </article>
+                </React.Fragment>
               );
             })}
           </div>
