@@ -290,8 +290,9 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
           <button className="secondary-btn" onClick={() => onExport("html")}>HTML</button>
         </div>
         <p className="export-note">
-          <strong>Stampa A4 verticale</strong> · scegli "Salva come PDF" per ottenere il file<br/>
-          da inviare in stamperia o caricare su Canva come template.
+          <strong>Stampa A4 verticale</strong> · scegli "Salva come PDF".<br/>
+          Nel dialogo: <strong>Margini → Nessuno</strong> e <strong>Scala → Predefinita (100%)</strong> per riempire il foglio.<br/>
+          Il PDF è pronto per la stamperia o per Canva come template.
         </p>
       </div>
 
