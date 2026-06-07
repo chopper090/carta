@@ -2205,3 +2205,53 @@ body{
   font-family: var(--f-serif, 'Cormorant Garamond', serif);
   font-style: italic; text-transform: none; letter-spacing: .05em; font-size: 15px;
 }
+
+/* ============================================================
+   VI — MENU LISTINO  ·  denso, multi-colonna, multi-pagina
+   Colori/font via variabili di tema (--ink/--gold/--cream/--f-*) → per-cliente.
+   ============================================================ */
+.sheet-listino .page-A4{ background: var(--cream); }
+.sheet-listino .lst-page{ display: flex; flex-direction: column; padding: 15mm 14mm 12mm; }
+.lst-head{
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
+  border-bottom: 1.5px solid var(--ink); padding-bottom: 6px; margin-bottom: 9px;
+}
+.lst-head .lst-wm .brand-logo{ height: 30px; width: auto; display: block; }
+.lst-head .lst-wm .brand-word{ font-family: var(--f-display); font-size: 22pt; line-height: 1; color: var(--ink); }
+.lst-meta{ display: flex; align-items: baseline; gap: 12px; }
+.lst-title{ font-family: var(--f-serif); font-size: 21pt; line-height: 1; color: var(--ink); letter-spacing: .01em; }
+.lst-folio{ font-family: var(--f-mono); font-size: 8pt; letter-spacing: .2em; text-transform: uppercase; color: var(--warm-grey); }
+.lst-wave{ color: var(--gold); height: 7px; display: block; margin: 0 0 8px; }
+.lst-body{ flex: 1 1 auto; column-gap: 11mm; column-fill: balance; }
+.lst-group{ break-inside: avoid; -webkit-column-break-inside: avoid; page-break-inside: avoid; margin: 0 0 9px; }
+.lst-sec{
+  font-family: var(--f-serif); font-size: 13.5pt; line-height: 1.05; color: var(--ink);
+  text-transform: uppercase; letter-spacing: .015em;
+  padding-bottom: 2.5px; margin-bottom: 4px; border-bottom: 1px solid var(--gold);
+}
+.lst-item{ margin-bottom: 4.5px; break-inside: avoid; }
+.lst-item-head{ display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.lst-item-name{ font-family: var(--f-body); font-weight: 500; font-size: 9.5pt; line-height: 1.18; color: var(--ink); }
+.lst-allg{ font-family: var(--f-mono); font-weight: 400; font-size: 6.8pt; color: var(--warm-grey); }
+.lst-item .dish-price{ font-family: var(--f-mono); font-size: 8.5pt; color: var(--ink); white-space: nowrap; }
+.lst-item .dish-price-sep{ display: none; }
+.lst-item-desc{ font-family: var(--f-body); font-weight: 300; font-size: 8pt; line-height: 1.28; color: var(--warm-grey); margin-top: .5px; }
+.lst-foot{ margin-top: 8px; border-top: 1px solid var(--line-soft); padding-top: 5px; }
+.lst-legend{ font-size: 6.4pt; line-height: 1.35; }
+/* baretto: titoli di sezione su banda cobalto (come il listino del PDF) */
+.sheet-listino[data-client="baretto"] .lst-sec{
+  color: #fff; background: var(--bt-cobalt); border-bottom: none;
+  padding: 3px 7px; letter-spacing: .04em;
+}
+
+/* Editor · selettore colonne (solo variante Listino) */
+.cols-pick{ display: flex; gap: 8px; }
+.cols-btn{
+  flex: 1; padding: 9px 0; border: 1px solid var(--line-soft); background: var(--cream-deep);
+  color: var(--warm-grey); border-radius: 8px; cursor: pointer; font-family: var(--f-mono);
+  font-size: 15px; line-height: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; transition: all .15s;
+}
+.cols-btn span{ font-size: 8px; letter-spacing: .18em; text-transform: uppercase; }
+.cols-btn:hover{ border-color: var(--gold); color: var(--ink); }
+.cols-btn.active{ border-color: var(--gold); background: var(--gold); color: var(--white); }
+.cols-hint{ font-size: 11px; color: var(--warm-grey); margin-top: 8px; line-height: 1.4; }

@@ -333,6 +333,7 @@ const EMPTY_MENU = {
   price: 0,
   chef: "",
   seats: 8,
+  cols: 2,
   chefNote: "",
   layout: {},   // posizioni drag&drop per variante: { [variante]: { [id]: {x,y} } }
   dishes: [

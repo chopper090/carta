@@ -656,6 +656,85 @@ function MenuDiario({ menu, client }) {
   );
 }
 
+// ============================================================
+// VI — MENU LISTINO  (denso, multi-colonna, multi-pagina · stile listino-bar)
+// Colonne 1/2/3 (menu.cols) via column-count; le pagine A4 si creano da sole
+// impacchettando le sezioni per "peso" stimato. Avvicina lo stile al menù PDF.
+// ============================================================
+function MenuListino({ menu, client }) {
+  const C = useClient(client);
+  const coast = C.decor === "coast";
+  const cols = Math.min(3, Math.max(1, menu.cols || 2));
+
+  // Raggruppa i piatti per sezione, mantenendo l'ordine
+  const groups = [];
+  (menu.dishes || []).forEach(d => {
+    const sec = d.section || "";
+    let g = groups[groups.length - 1];
+    if (!g || g.section !== sec) { g = { section: sec, items: [] }; groups.push(g); }
+    g.items.push(d);
+  });
+
+  // Peso stimato di ogni gruppo → impacchetta i gruppi in pagine A4 (conservativo)
+  const wDish = d => 1 + (((d.desc || "").length > 44) ? 0.6 : 0);
+  const wGroup = g => (g.section ? 1 : 0) + g.items.reduce((s, d) => s + wDish(d), 0);
+  const PER_COL = 20;
+  const budget = cols * PER_COL;
+  const pages = [];
+  let cur = [], curW = 0;
+  groups.forEach(g => {
+    const w = wGroup(g);
+    if (cur.length && curW + w > budget) { pages.push(cur); cur = []; curW = 0; }
+    cur.push(g); curW += w;
+  });
+  if (cur.length) pages.push(cur);
+
+  return (
+    <div className="sheet sheet-listino" data-client={C.id} data-screen-label="Menu Listino">
+      {pages.map((pageGroups, pi) => (
+        <div className="page-A4 lst-page" key={pi}>
+          <div className="lst-head">
+            <span className="lst-wm"><Brand client={C} className="brand-sm" /></span>
+            <span className="lst-meta">
+              <span className="lst-title">{menu.name || "—"}</span>
+              {pages.length > 1 && <span className="lst-folio">{romanize(pi + 1)} / {romanize(pages.length)}</span>}
+            </span>
+          </div>
+
+          {pi === 0 && coast && <CoastWave className="lst-wave" />}
+
+          <div className="lst-body" style={{ columnCount: cols }}>
+            {pageGroups.map((g, gi) => (
+              <section className="lst-group" key={gi}>
+                {g.section && <div className="lst-sec">{g.section}</div>}
+                {g.items.map((d, di) => (
+                  <div className="lst-item" key={di}>
+                    <div className="lst-item-head">
+                      <span className="lst-item-name">
+                        {d.name || "—"}
+                        {d.allergens && d.allergens.length > 0 &&
+                          <span className="lst-allg"> ({[...d.allergens].sort((a, b) => a - b).join("·")})</span>}
+                      </span>
+                      <DishPrice value={d.price} />
+                    </div>
+                    {d.desc && <div className="lst-item-desc">{d.desc}</div>}
+                  </div>
+                ))}
+              </section>
+            ))}
+          </div>
+
+          {pi === pages.length - 1 && (
+            <div className="lst-foot">
+              <AllergensLegend className="lst-legend" />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ---- Helpers ----
 function romanize(n){
   const map = [
@@ -668,7 +747,7 @@ function romanize(n){
 }
 
 Object.assign(window, {
-  MenuClassico, MenuContemporaneo, MenuTabula, MenuEditoriale, MenuDiario,
+  MenuClassico, MenuContemporaneo, MenuTabula, MenuEditoriale, MenuDiario, MenuListino,
   Brand, DishPrice, CoastWave, Citrus, Draggable, DragCtx,
   formatDate, formatPrice, ALLERGENI
 });

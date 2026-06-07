@@ -8,7 +8,8 @@ const VARIANTS = [
   { id: "contemporaneo",  num: "II",  name: "Contemporaneo",  desc: "editoriale, asimmetrico",       tags: "essenziale · 2 pagine" },
   { id: "tabula",         num: "III", name: "Tabula",         desc: "ultra-minimale, una pagina",    tags: "essenziale · 1 pagina" },
   { id: "editoriale",     num: "IV",  name: "Editoriale",     desc: "con foto e racconto",           tags: "racconto · multi-pagina" },
-  { id: "diario",         num: "V",   name: "Diario",         desc: "racconto, senza foto",          tags: "racconto · multi-pagina" }
+  { id: "diario",         num: "V",   name: "Diario",         desc: "racconto, senza foto",          tags: "racconto · multi-pagina" },
+  { id: "listino",        num: "VI",  name: "Listino",        desc: "denso, multi-colonna",          tags: "bar · multi-pagina" }
 ];
 
 const NARRATIVE_VARIANTS = new Set(["editoriale", "diario"]);
@@ -151,6 +152,20 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
           ))}
         </div>
       </div>
+
+      {variant === "listino" && (
+        <div className="form-section">
+          <div className="section-label">Colonne · Listino</div>
+          <div className="cols-pick">
+            {[1, 2, 3].map(n => (
+              <button key={n} type="button"
+                className={"cols-btn " + (((menu.cols || 2) === n) ? "active" : "")}
+                onClick={() => updateField("cols", n)}>{n}<span>col</span></button>
+            ))}
+          </div>
+          <p className="cols-hint">Più colonne = più compatto. Le pagine A4 si creano da sole: stampi quelle che ti servono.</p>
+        </div>
+      )}
 
       <div className="form-section">
         <div className="section-label">Carica esempio</div>

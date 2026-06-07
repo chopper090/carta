@@ -101,14 +101,16 @@ function App(){
     contemporaneo: MenuContemporaneo,
     tabula: MenuTabula,
     editoriale: MenuEditoriale,
-    diario: MenuDiario
+    diario: MenuDiario,
+    listino: MenuListino
   };
   const VLABELS = {
     classico: "I · Classico",
     contemporaneo: "II · Contemporaneo",
     tabula: "III · Tabula",
     editoriale: "IV · Editoriale",
-    diario: "V · Diario"
+    diario: "V · Diario",
+    listino: "VI · Listino"
   };
   const SheetComponent = SHEETS[variant] || MenuContemporaneo;
   const [zoom, setZoom] = useState(0.55);
