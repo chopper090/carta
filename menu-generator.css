@@ -1760,6 +1760,9 @@ body{
     height: 297mm;
   }
   .page-A4:last-child{ page-break-after: avoid;}
+  /* Stampa selettiva: solo la pagina corrente */
+  .app[data-print-scope="current"] .page-A4:not([data-current]){ display: none !important; }
+  .app[data-print-scope="current"] .page-A4[data-current]{ page-break-after: avoid !important; }
 }
 
 /* ============================================================
@@ -2087,6 +2090,26 @@ body{
   .ptb-print-lbl{ display: none; }
   .ptb-print{ padding: 0 7px; }
 }
+
+/* Navigatore pagine + Adatta nella toolbar dell'anteprima */
+.preview-toolbar .ptb-pages{ display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.preview-toolbar .ptb-pages button{
+  width: 22px; height: 22px; background: transparent; border: 1px solid var(--line-soft);
+  color: var(--warm-grey); cursor: pointer; font-family: var(--f-serif); font-size: 15px;
+  line-height: 1; padding: 0; transition: all .15s ease;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.preview-toolbar .ptb-pages button:hover:not(:disabled){ background: var(--gold); color: var(--ink); border-color: var(--gold); }
+.preview-toolbar .ptb-pages button:disabled{ opacity: .35; cursor: default; }
+.preview-toolbar .ptb-pageval{ min-width: 32px; text-align: center; color: var(--ink); }
+.preview-toolbar .ptb-printpage svg{ display: block; }
+.ptb-fit{
+  width: 26px; height: 22px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid var(--line-soft); color: var(--warm-grey);
+  cursor: pointer; padding: 0; line-height: 1; transition: all .15s ease;
+}
+.ptb-fit:hover{ background: var(--gold); color: var(--ink); border-color: var(--gold); }
+.ptb-fit svg{ display: block; }
 
 /* Focus visibile per la navigazione da tastiera */
 :where(button, a, input, textarea, select):focus-visible{
