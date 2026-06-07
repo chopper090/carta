@@ -459,7 +459,7 @@ body{
   padding: 36px 0;
   display: flex;
   flex-direction: column;
-  align-items: safe center;
+  align-items: center;
   gap: 36px;
   position: relative;
 }
@@ -1727,7 +1727,7 @@ body{
     size: A4 portrait;
     margin: 0;
   }
-  html, body{ overflow: visible; background: white;}
+  html, body{ overflow: visible; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .form-panel, .preview-toolbar, .mobile-tabs, .app > .preview-pane > .sheet-stack > .sheet > *:not(.page-A4){
     display: none !important;
   }
@@ -1753,11 +1753,14 @@ body{
   }
   .page-A4{
     box-shadow: none;
+    border: none;
     page-break-after: always;
     page-break-inside: avoid;
-    margin: 0;
+    margin: 0 auto;            /* centrata sul foglio */
     width: 210mm;
     height: 297mm;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact; /* stampa gli sfondi colorati (bande sezione, ecc.) */
   }
   .page-A4:last-child{ page-break-after: avoid;}
   /* Stampa selettiva: solo la pagina corrente */
