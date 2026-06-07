@@ -1727,47 +1727,67 @@ body{
     size: A4 portrait;
     margin: 0;
   }
-  html, body{ overflow: visible; background: white; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .form-panel, .preview-toolbar, .mobile-tabs, .app > .preview-pane > .sheet-stack > .sheet > *:not(.page-A4){
+  /* Reset radicale per la stampa. Due trappole risolte qui:
+     1) il page-box A4 è ~793px → senza questo blocco il breakpoint mobile
+        (vedi `@media screen and (max-width:860px)`) nasconderebbe l'anteprima;
+     2) l'anteprima a schermo è scalata via `transform` inline su .sheet-stack:
+        va azzerata o il menù esce rimpicciolito dentro il foglio A4. */
+  html, body{
+    width: auto; height: auto; margin: 0; padding: 0;
+    overflow: visible; background: white;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  /* #root è flex/100vh a schermo: in stampa deve scorrere su più fogli. */
+  #root{ display: block; height: auto; }
+  .form-panel, .preview-toolbar, .mobile-tabs, .drag-guide-layer,
+  .app > .preview-pane > .sheet-stack > .sheet > *:not(.page-A4){
     display: none !important;
   }
   .app{
-    display: block;
-    height: auto;
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
   }
+  /* L'anteprima è SEMPRE visibile in stampa, qualunque sia la vista mobile
+     (editor/anteprima) o lo scope: è da qui che escono le pagine. */
   .preview-pane{
+    display: block !important;
     background: white;
-    padding: 0;
+    padding: 0 !important;
+    margin: 0;
     overflow: visible;
-    display: block;
   }
+  /* Azzera lo zoom dell'anteprima → in stampa il foglio è sempre a
+     grandezza naturale A4, mai rimpicciolito. */
   .sheet-stack{
-    padding: 0;
-    gap: 0;
-    display: block;
+    display: block !important;
+    transform: none !important;
+    padding: 0; gap: 0;
   }
   .sheet{
+    display: block;
     transform: none !important;
     gap: 0 !important;
-    display: block;
   }
   .page-A4{
-    box-shadow: none;
-    border: none;
     box-sizing: border-box;
-    page-break-after: always;
-    page-break-inside: avoid;
-    margin: 0 auto;            /* centrata sul foglio */
     width: 210mm;
     height: 296mm;             /* 296 (non 297) → evita l'overflow di 1px che crea pagine vuote extra */
+    margin: 0 auto;            /* centrata sul foglio */
+    box-shadow: none;
+    border: none;
     overflow: hidden;          /* contiene eventuali sbordi → niente pagine in più */
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-after: page;
+    page-break-after: always;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact; /* stampa gli sfondi colorati (bande sezione, ecc.) */
   }
-  .page-A4:last-child{ page-break-after: avoid;}
+  .page-A4:last-child{ break-after: avoid; page-break-after: avoid; }
   /* Stampa selettiva: solo la pagina corrente */
   .app[data-print-scope="current"] .page-A4:not([data-current]){ display: none !important; }
-  .app[data-print-scope="current"] .page-A4[data-current]{ page-break-after: avoid !important; }
+  .app[data-print-scope="current"] .page-A4[data-current]{ break-after: avoid !important; page-break-after: avoid !important; }
 }
 
 /* ============================================================
@@ -2091,7 +2111,7 @@ body{
 }
 .ptb-print:hover{ background: var(--ink); border-color: var(--ink); color: var(--cream); }
 .ptb-print svg{ display: block; }
-@media (max-width: 540px){
+@media screen and (max-width: 540px){
   .ptb-print-lbl{ display: none; }
   .ptb-print{ padding: 0 7px; }
 }
@@ -2133,8 +2153,11 @@ body{
 
 /* ============================================================
    RESPONSIVE — sotto 860px: una colonna + tab Editor/Anteprima
+   `screen and` è ESSENZIALE: in stampa il page-box A4 è ~793px e senza
+   questo vincolo il breakpoint scatterebbe, nascondendo l'anteprima (pagina
+   bianca) e/o applicando il layout mobile al foglio.
    ============================================================ */
-@media (max-width: 860px){
+@media screen and (max-width: 860px){
   .app{ grid-template-columns: 1fr; }
   .app[data-mview="editor"] .preview-pane{ display: none; }
   .app[data-mview="preview"] .form-panel{ display: none; }

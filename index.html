@@ -380,7 +380,7 @@ function buildStandaloneHTML(menu, variant, clientId){
 <script type="text/babel">
 const MENU = ${JSON.stringify(menu, null, 2)};
 const CLIENT = getClient(${JSON.stringify(clientId)});
-const SheetMap = { classico: MenuClassico, contemporaneo: MenuContemporaneo, tabula: MenuTabula, editoriale: MenuEditoriale, diario: MenuDiario };
+const SheetMap = { classico: MenuClassico, contemporaneo: MenuContemporaneo, tabula: MenuTabula, editoriale: MenuEditoriale, diario: MenuDiario, listino: MenuListino };
 const Sheet = SheetMap[${JSON.stringify(variant)}] || MenuContemporaneo;
 ReactDOM.createRoot(document.getElementById("root")).render(<Sheet menu={MENU} client={CLIENT} />);
 <\/script>
