@@ -274,6 +274,233 @@ const BARETTO_CUCINA = {
 };
 
 // ============================================================
+// CLIENTE · il baretto — BEVERAGE / drink list completa
+// Estratta da baretto_beverage_list. Prezzi in € (numeri). desc = ingredienti.
+// Allergeni lasciati vuoti: da assegnare a mano dall'app.
+// ============================================================
+const BEV = (name, section, desc, price) => ({ name, section, desc, story: "", image: null, price, allergens: [] });
+
+const BARETTO_BEVERAGE = {
+  name: "Beverage",
+  category: "cocktail",
+  date: "",
+  price: null,
+  chef: "il baretto",
+  seats: 8,
+  chefNote: "Cocktail bar & wine bar · Via Consolare Pompea 1289, Messina · @il_baretto_me",
+  dishes: [
+    // — Soft Drink —
+    BEV("Acqua San Benedetto", "Soft Drink", "in lattina, naturale / frizzante", 1),
+    BEV("Spremuta d'Arancia", "Soft Drink", "", 3.5),
+    BEV("Spremuta di Pompelmo", "Soft Drink", "", 3.5),
+    BEV("Spremuta di Pompelmo / Lime", "Soft Drink", "", 4),
+    BEV("Bibite alla Spina", "Soft Drink", "Coca-Cola, Schweppes Tonica/Lemon", 3.5),
+    BEV("Bibite Artigianali Siciliane \"Cugini Caruso\"", "Soft Drink", "Ginger Beer / Spuma / Aranciata / Chinotto / Mandarinata e Cola", 5),
+    BEV("Bibite Fever Tree - Three Cents", "Soft Drink", "Grapefruit Soda / Aegean Tonic / Dry Tonic", 4),
+
+    // — Amari —
+    BEV("Amara", "Amari", "", 5),
+    BEV("Brancamenta", "Amari", "", 5),
+    BEV("Fernet-Branca", "Amari", "", 5),
+    BEV("Cynar", "Amari", "", 5),
+    BEV("Jägermeister", "Amari", "", 5),
+    BEV("Maliquò", "Amari", "", 5),
+
+    // — Grappe —
+    BEV("Casta", "Grappe", "Grappa di Prosecco", 7),
+    BEV("Nardini", "Grappe", "Grappa Barrique", 6),
+
+    // — Cocktail · I Grandi Classici —
+    BEV("Aviation", "I Grandi Classici", "Gin Bombay Dry, Liquore di Marasche, Crema di Violetta, Succo di Limone", 8),
+    BEV("Cardinale", "I Grandi Classici", "Gin Tanqueray, Noilly Prat, Campari", 8),
+    BEV("French '57", "I Grandi Classici", "Gin Bombay Dry, Prosecco, Succo di Lime, Zucchero", 8),
+    BEV("Hanky-Panky", "I Grandi Classici", "Gin Bombay Dry, Vermouth Berto, Fernet-Branca", 8),
+    BEV("Bramble", "I Grandi Classici", "Gin Bombay Sapphire, Liquore di More, Succo di Lime, Zucchero", 8),
+    BEV("Negroni Riserva", "I Grandi Classici", "Gin Bombay Dry, Bitter Martini Riserva Speciale, Vermouth Rubino Riserva Speciale", 10),
+    BEV("Americano Martini", "I Grandi Classici", "Bitter Martini Riserva Speciale, Vermouth Rubino Riserva Speciale, Soda", 8),
+    BEV("Maker's Mint Julep", "I Grandi Classici", "Whiskey Bourbon Maker's Mark, Menta fresca, Zucchero", 10),
+    BEV("Redhook", "I Grandi Classici", "Whiskey Rye Jim Beam, Liquore di Marasche, Punt e Mes", 8),
+    BEV("Stinger", "I Grandi Classici", "Cognac, Liquore alla Menta", 8),
+    BEV("New York Sour", "I Grandi Classici", "Whiskey Bourbon Jim Beam, Porto Rosso, Succo di Limone, Zucchero, Acqua Faba/Chiara d'Uovo", 8),
+
+    // — Cocktail · Quota Rosa —
+    BEV("Paloma", "Quota Rosa", "Tequila Cazadores, Succo di Lime, Sciroppo di Agave Bio, Soda al Pompelmo Rosa", 9),
+    BEV("Ancho Paloma", "Quota Rosa", "Mezcal, Ancho Reyes, Succo di Lime, Sciroppo di Agave Bio, Soda al Pompelmo Rosa", 9),
+    BEV("Daiquiri Hemingway", "Quota Rosa", "Rum Bacardi Carta Blanca, Liquore di Marasche, Succo di Pompelmo Rosa, Succo di Lime", 9),
+    BEV("Gallo", "Quota Rosa", "Gin Bombay Sapphire, Bitter Berto, Succo di Lime, Succo di Pompelmo Rosa, Zucchero", 9),
+    BEV("Coral", "Quota Rosa", "Gin Bombay Sapphire, Amara, Bitter all'Arancia, Succo di Lime, Succo di Pompelmo, Zucchero", 9),
+    BEV("Palmalive", "Quota Rosa", "Tequila Cazadores, Ancho Reyes Verde, Sciroppo d'Agave (bio), Tabasco Jalapeño Verde, Succo di Lime, Soda al Pompelmo Rosa", 9),
+
+    // — Cocktail · Barettology · Tropicali —
+    BEV("Mai Tai", "Barettology · Tropicali", "Jamaican Rum, Spiced Rum, Orange Curaçao, Succo di Lime, Sciroppo di Orzata", 8),
+    BEV("Passion Rita", "Barettology · Tropicali", "Tequila Cazadores, Sciroppo di Agave (Bio), Passion Fruit, Succo di Lime", 9),
+    BEV("Castaway", "Barettology · Tropicali", "Tequila Cazadores, Sciroppo di Agave (bio), Succo di Ananas, Succo di Lime, Peperoncino", 9),
+    BEV("Platano", "Barettology · Tropicali", "Rum Plantation, Liquore alla Banana, Succo di Lime, Purea di Banane", 10),
+    BEV("Singapore Sling", "Barettology · Tropicali", "Gin Bombay Dry, Liquore alla Ciliegia, Liquore all'Arancia, Succo di Ananas, Succo di Lime, Granatina", 9),
+    BEV("Grapeon", "Barettology · Tropicali", "Whiskey Bourbon Jim Beam, Purea di Ananas, Succo di Pompelmo Rosa, Angostura", 9),
+    BEV("Tia Mia", "Barettology · Tropicali", "Jamaican Rum, Mezcal, Orange Curaçao, Sciroppo d'Orzata, Succo di Lime", 10),
+    BEV("Pisco Sour", "Barettology · Tropicali", "Pisco, Bitter Amargo Chuncho, Succo di Lime, Zucchero, Acqua Faba/Chiara d'Uovo", 10),
+    BEV("Alive", "Barettology · Tropicali", "Tequila Cazadores, Ancho Reyes Verde, Sciroppo d'Agave (bio), Tabasco Jalapeño Verde, Succo di Lime", 10),
+    BEV("Margalice", "Barettology · Tropicali", "Tequila Cazadores, Sciroppo d'Agave (bio), Succo di Lime, Peperoncino, Sale Rosa", 9),
+
+    // — Cocktail · Barettology · Freschi —
+    BEV("Garibaldi", "Barettology · Freschi", "Bitter, Succo d'Arancia", 8),
+    BEV("Mancino", "Barettology · Freschi", "Vodka al Mandarino, Succo di Limone, Sciroppo di Zucchero", 9),
+    BEV("Harvey Wallbanger", "Barettology · Freschi", "Vodka Below 42°, Galliano, Succo d'Arancia", 8),
+    BEV("Civico 1289", "Barettology · Freschi", "Vermouth Rosso, Bitter, Bitter Cardamomo, Ginger Beer", 9),
+    BEV("Ginger Mojito", "Barettology · Freschi", "Rum Bacardi Carta Blanca, Succo di Lime, Menta, Sciroppo di Zenzero, Ginger Beer", 9),
+
+    // — Cocktail · Barettology · W Maria (Bloody) —
+    BEV("Bloody Mary", "Barettology · W Maria", "Vodka Below 42°, Succo di Pomodoro, Succo di Lime, Salsa Worcester, Pepe Nero, Sale, Tabasco", 8),
+    BEV("Bloody Mezcal", "Barettology · W Maria", "Mezcal, Ancho Reyes, Bitter al Sedano, Succo di Pomodoro, Succo di Lime, Salsa Worcester, Pepe Nero, Sale, Tabasco", 10),
+    BEV("Bloody Grey", "Barettology · W Maria", "Vodka Grey Goose, Bitter al Sedano, Succo di Pomodoro, Succo di Lime, Salsa Worcester, Tabasco, Pepe Nero, Sale", 10),
+
+    // — Cocktail · Barettology · Patron —
+    BEV("Espresso Patron", "Barettology · Patron", "Tequila Patron Silver, Tequila Patron XO Café, Caffè Espresso", 12),
+    BEV("Manhattan Patron", "Barettology · Patron", "Tequila Patron Reposado, Vermouth Rubino Riserva Speciale, Angostura", 12),
+    BEV("Patron Perfect Margarita", "Barettology · Patron", "Tequila Patron Silver, Patron Citronge, Succo di Lime, Succo d'Arancia", 12),
+    BEV("Patron Tommy's Margarita", "Barettology · Patron", "Tequila Patron Reposado, Sciroppo di Agave (bio), Succo di Lime", 12),
+    BEV("Patronic", "Barettology · Patron", "Tequila Patron Silver, Acqua Tonica, Succo di Lime", 10),
+
+    // — Cocktail · Barettology · Herbal —
+    BEV("Sagerita", "Barettology · Herbal", "Tequila Cazadores, St. Germain, Succo di Lime, Succo d'Arancia, Succo di Limone, Salvia", 9),
+    BEV("Basilio", "Barettology · Herbal", "Vodka Below 42° / Gin Bombay Dry, Succo di Lime, Basilico, Sciroppo di Zucchero", 8),
+    BEV("South Side", "Barettology · Herbal", "Gin Bombay Dry, Succo di Lime, Sciroppo di Zucchero, Menta", 8),
+
+    // — Cocktail · Analcolici —
+    BEV("Analcolico alla Frutta", "Analcolici", "", 7),
+    BEV("Virgin Mojito", "Analcolici", "Ginger Ale, Succo di Lime, Menta", 8),
+    BEV("Virgin Mule", "Analcolici", "Ginger Ale, Sciroppo di Zenzero, Succo di Lime, Menta", 8),
+    BEV("Virgin Garibaldi", "Analcolici", "Martini Vibrante, Succo d'Arancia, Succo di Passionfruit", 8),
+    BEV("Virgin Spritz", "Analcolici", "Martini Aperitivo Floreale / Vibrante, Soda", 8),
+    BEV("Virgin Bloody", "Analcolici", "Succo di Pomodoro, Succo di Lime, Salsa Worcester, Pepe Nero, Sale, Tabasco", 8),
+    BEV("Tanqueray 0,0% Tonic", "Analcolici", "Tanqueray 0,0, Tonica", 8),
+    BEV("A-Paloma", "Analcolici", "Succo di Lime, Sciroppo di Agave Bio, Soda al Pompelmo Rosa", 8),
+    BEV("Paloma 0,0", "Analcolici", "Tanqueray 0,0, Succo di Lime, Succo di Pompelmo, Sciroppo d'Agave, Soda al Pompelmo Rosa", 8),
+
+    // — Birre —
+    BEV("Beck's", "Birre", "33cl · Pilsner · 5%", 4),
+    BEV("Corona", "Birre", "33cl · Lager · 4,5%", 5),
+    BEV("Aro", "Birre", "33cl · American Pale Ale (Gluten free) · 4,7%", 6),
+    BEV("Freak Ambrata", "Birre", "33cl · Con miele dell'Etna · 7%", 6),
+    BEV("Malastrana", "Birre", "40cl · Pilsner · 4,7%", 6),
+    BEV("Alternative", "Birre", "33cl · Fruit and Juicy IPA · 6,7%", 6),
+    BEV("Freak IPA", "Birre", "33cl · Con scorze di limone di Sicilia · 6%", 6),
+    BEV("Reveille", "Birre", "33cl · White IPA · 6,5%", 6),
+    BEV("Flooke", "Birre", "33cl · Amber Lager · 6,5%", 6),
+    BEV("Corona Cero", "Birre", "33cl · Lager 0.0%", 5),
+    BEV("Begrapeful", "Birre", "33cl · Italian Grape Ale · 5,2%", 6),
+
+    // — Distillati · Whisky —
+    BEV("Johnnie Walker Red Label", "Whisky", "", 6),
+    BEV("Johnnie Walker Black Label", "Whisky", "", 8),
+    BEV("Bushmills", "Whisky", "", 6),
+    BEV("Bushmills 10", "Whisky", "", 10),
+    BEV("Bushmills Black", "Whisky", "", 8),
+    BEV("Hatozaki", "Whisky", "", 10),
+    BEV("Hatozaki Pure Malt", "Whisky", "", 12),
+    BEV("Jameson", "Whisky", "", 6),
+    BEV("Jim Beam", "Whisky", "", 7),
+    BEV("Jim Beam Rye", "Whisky", "", 7),
+    BEV("Knob Creek", "Whisky", "", 10),
+    BEV("Laphroaig 10", "Whisky", "", 8),
+    BEV("Maker's Mark", "Whisky", "", 8),
+    BEV("Old Virginia", "Whisky", "", 6),
+    BEV("Paddy", "Whisky", "", 6),
+    BEV("Pig's Nose", "Whisky", "", 8),
+    BEV("Talisker Skye", "Whisky", "", 8),
+
+    // — Distillati · Rum —
+    BEV("Diplomatico", "Rum", "", 8),
+    BEV("Diplomatico Mantuano", "Rum", "", 9),
+    BEV("Diplomatico Seleccion de la Familia", "Rum", "", 10),
+    BEV("Myer's Rum", "Rum", "", 6),
+    BEV("Bacardi Carta Oro", "Rum", "", 6),
+    BEV("Plantation", "Rum", "", 8),
+    BEV("Plantation Isle of Fiji", "Rum", "", 10),
+    BEV("Santa Teresa", "Rum", "", 8),
+
+    // — Distillati · Gin —
+    BEV("Beefeater", "Gin", "", 7),
+    BEV("Berto", "Gin", "", 9),
+    BEV("Bobby's", "Gin", "", 10),
+    BEV("Bombay Dry", "Gin", "", 7),
+    BEV("Bond 47°", "Gin", "", 10),
+    BEV("Burnett's", "Gin", "", 10),
+    BEV("Citadelle", "Gin", "", 10),
+    BEV("Citadelle Jardin d'Eté", "Gin", "", 10),
+    BEV("Citadelle Reserve", "Gin", "", 10),
+    BEV("Edimburgh", "Gin", "", 9),
+    BEV("Elephant", "Gin", "", 11),
+    BEV("Elephant Orange", "Gin", "", 11),
+    BEV("Genever", "Gin", "", 10),
+    BEV("Gil", "Gin", "", 10),
+    BEV("Gil Peated", "Gin", "", 11),
+    BEV("Greenall's", "Gin", "", 8),
+    BEV("Hendrick's", "Gin", "", 9),
+    BEV("Ionico", "Gin", "", 10),
+    BEV("Mongibello", "Gin", "", 10),
+    BEV("Martin Miller's", "Gin", "", 9),
+    BEV("Opihr", "Gin", "", 9),
+    BEV("Plymouth", "Gin", "", 9),
+    BEV("Plymouth 57", "Gin", "", 10),
+    BEV("Bombay Sapphire", "Gin", "", 8),
+    BEV("Principe de los Apostoles", "Gin", "", 11),
+    BEV("Principe de los Apostoles Rosa", "Gin", "", 11),
+    BEV("Roku", "Gin", "", 9),
+    BEV("Silvius", "Gin", "", 10),
+    BEV("Tanqueray", "Gin", "", 7),
+    BEV("Tanqueray Ten", "Gin", "", 10),
+    BEV("The London No.1", "Gin", "", 10),
+
+    // — Distillati · Tequila —
+    BEV("Altos", "Tequila", "", 8),
+    BEV("Cazadores", "Tequila", "", 6),
+    BEV("Espolon", "Tequila", "", 7),
+    BEV("Arette Blanco", "Tequila", "", 9),
+    BEV("Arette Reposado", "Tequila", "", 10),
+    BEV("Corralejo 99000", "Tequila", "", 14),
+    BEV("Jose Cuervo Tradicional", "Tequila", "", 8),
+    BEV("Patron Silver", "Tequila", "", 10),
+    BEV("Calle 23 Reposado", "Tequila", "", 11),
+    BEV("Nuestra Soledad", "Tequila", "", 10),
+    BEV("Patron Reposado", "Tequila", "", 11),
+    BEV("Patron Añejo", "Tequila", "", 12),
+    BEV("Sotol Hacienda de Chihuahua", "Tequila", "", null),
+
+    // — Distillati · Mezcal —
+    BEV("Bruxo", "Mezcal", "", 12),
+    BEV("Calle 23", "Mezcal", "", 10),
+    BEV("Yuu Baal 40", "Mezcal", "", 9),
+    BEV("Yuu Baal 46", "Mezcal", "", 10),
+    BEV("Alipus San Juan", "Mezcal", "", 10),
+    BEV("Sotol", "Mezcal", "", 12),
+    BEV("Herencia de Sanchez", "Mezcal", "", 10),
+    BEV("Vida", "Mezcal", "", 10),
+    BEV("Pechiga Yuu Baal", "Mezcal", "", 11),
+    BEV("Nuestra Soledad", "Mezcal", "", 10),
+
+    // — Distillati · Vodka —
+    BEV("Below 42", "Vodka", "", 6),
+    BEV("Beluga", "Vodka", "", 11),
+    BEV("Grey Goose", "Vodka", "", 9),
+    BEV("Koskenkorva", "Vodka", "", 7),
+    BEV("Our Berlin", "Vodka", "", 7),
+    BEV("Russian Standard", "Vodka", "", 7),
+    BEV("Stolichnaya", "Vodka", "", 7),
+    BEV("Vestal", "Vodka", "", 8),
+    BEV("Zubrowka", "Vodka", "", 7),
+    BEV("Vodka F.lli Pistone", "Vodka", "", 7),
+    BEV("Absolut Mandarin", "Vodka", "", 7),
+
+    // — Distillati · Tonica (supplemento) —
+    BEV("Schweppes", "Tonica (supplemento)", "", 1),
+    BEV("Fever Tree / Three Cents", "Tonica (supplemento)", "", 3),
+    BEV("Tonica 1724", "Tonica (supplemento)", "", 3)
+  ]
+};
+
+// ============================================================
 // DEMO · menu di esempio neutro (cliente "demo", white-label)
 // ============================================================
 const MENU_DEMO = {
@@ -323,7 +550,8 @@ const PRESET_MENUS = {
   terraemare: MENU_TERRAEMARE,
   barettoSignature: BARETTO_SIGNATURE,
   barettoClassici: BARETTO_CLASSICI,
-  barettoCucina: BARETTO_CUCINA
+  barettoCucina: BARETTO_CUCINA,
+  barettoBeverage: BARETTO_BEVERAGE
 };
 
 const EMPTY_MENU = {
