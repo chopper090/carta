@@ -2353,6 +2353,39 @@ body{
   letter-spacing: .04em;
 }
 
+/* Editor · toggle "sezione = nuova pagina" */
+.section-break-toggle{
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 12px; border: 1px solid var(--line-soft); background: var(--cream-deep);
+  color: var(--warm-grey); border-radius: 8px; cursor: pointer; transition: all .15s;
+  font-family: var(--f-body); font-size: 12.5px;
+}
+.section-break-toggle:hover{ border-color: var(--gold); color: var(--ink); }
+.section-break-toggle.active{ border-color: var(--gold); color: var(--ink); background: color-mix(in srgb, var(--gold) 12%, var(--cream-deep)); }
+.sbt-check{
+  flex: 0 0 auto; width: 18px; height: 18px; border-radius: 5px; border: 1px solid var(--line-soft);
+  display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--white);
+  background: transparent;
+}
+.section-break-toggle.active .sbt-check{ background: var(--gold); border-color: var(--gold); }
+
+/* Editor · riga di spostamento di un'intera sezione */
+.section-move-row{
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin: 14px 0 6px; padding: 7px 10px; border-radius: 8px;
+  background: color-mix(in srgb, var(--gold) 10%, var(--cream-deep));
+  border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent);
+}
+.section-move-row:first-child{ margin-top: 0; }
+.section-move-name{
+  font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink); display: flex; align-items: baseline; gap: 6px; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.section-move-none{ font-style: italic; color: var(--warm-grey); text-transform: none; letter-spacing: 0; }
+.section-move-count{ color: var(--warm-grey); font-size: 9.5px; }
+.section-move-ctrls{ display: flex; gap: 4px; flex: 0 0 auto; }
+
 /* ============================================================
    Impaginazione multi-colonna / multi-pagina (stili a lista)
    Evita che una voce o una sezione venga spezzata tra colonne/pagine.
