@@ -2323,3 +2323,53 @@ body{
 .cols-btn:hover{ border-color: var(--gold); color: var(--ink); }
 .cols-btn.active{ border-color: var(--gold); background: var(--gold); color: var(--white); }
 .cols-hint{ font-size: 11px; color: var(--warm-grey); margin-top: 8px; line-height: 1.4; }
+
+/* Editor · sotto-etichette e controllo "voci per pagina" */
+.pp-sublabel{
+  font-family: var(--f-mono); font-size: 9px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--warm-grey); margin: 12px 0 6px;
+}
+.pp-sublabel:first-of-type{ margin-top: 2px; }
+.pp-pick{ display: flex; gap: 8px; align-items: stretch; }
+.pp-auto{
+  flex: 0 0 auto; padding: 0 16px; border: 1px solid var(--line-soft); background: var(--cream-deep);
+  color: var(--warm-grey); border-radius: 8px; cursor: pointer; font-family: var(--f-mono);
+  font-size: 12px; letter-spacing: .08em; text-transform: uppercase; transition: all .15s;
+}
+.pp-auto:hover{ border-color: var(--gold); color: var(--ink); }
+.pp-auto.active{ border-color: var(--gold); background: var(--gold); color: var(--white); }
+.pp-step{
+  flex: 1; display: flex; align-items: center; justify-content: space-between;
+  border: 1px solid var(--line-soft); background: var(--cream-deep); border-radius: 8px; overflow: hidden;
+}
+.pp-step button{
+  width: 40px; align-self: stretch; border: none; background: transparent; color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; transition: background .15s;
+}
+.pp-step button:hover:not(:disabled){ background: var(--gold-soft); }
+.pp-step button:disabled{ color: var(--warm-grey-light); cursor: default; }
+.pp-val{
+  flex: 1; text-align: center; font-family: var(--f-mono); font-size: 14px; color: var(--ink);
+  letter-spacing: .04em;
+}
+
+/* ============================================================
+   Impaginazione multi-colonna / multi-pagina (stili a lista)
+   Evita che una voce o una sezione venga spezzata tra colonne/pagine.
+   ============================================================ */
+.dish-c, .dish-m, .tab-dish{
+  break-inside: avoid; -webkit-column-break-inside: avoid; page-break-inside: avoid;
+}
+/* Testata compatta delle pagine di continuazione (Tabula, pagina 2+) */
+.tab-title-cont{
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 4mm 0 8mm; border-bottom: 0.3pt solid var(--gold); margin-bottom: 6mm;
+}
+.tab-name-cont{
+  font-family: var(--f-serif); font-style: italic; font-size: 22pt; line-height: 1; color: var(--ink);
+}
+.tab-folio-cont{
+  font-family: var(--f-mono); font-size: 8.5pt; letter-spacing: .2em; text-transform: uppercase; color: var(--warm-grey);
+}
+/* Numero pagina nel titolino interno del Classico */
+.inner-folio-c{ color: var(--gold); }

@@ -123,6 +123,69 @@ function Draggable({ id, offset, children }){
 // offset salvato per (variante, id)
 const layoutOf = (menu, variant) => (menu && menu.layout && menu.layout[variant]) || {};
 
+// ============================================================
+// Impaginazione per-variante — colonne + voci per pagina.
+// Le impostazioni vivono in menu.grid[variante] = { cols, perPage }.
+//   perPage === 0  → automatico: le pagine A4 si riempiono da sole in base
+//                    al contenuto, senza limiti (anche 100 pagine).
+//   perPage  >  0  → numero fisso di voci per pagina scelto dall'utente.
+//   cols           → numero di colonne (solo stili "a lista").
+// Il motore non ha più tetti fissi: pagine e colonne seguono i dati.
+// ============================================================
+const GRID_DEFAULTS = {
+  classico:      { cols: 1, perPage: 0, maxCols: 3 },
+  contemporaneo: { cols: 1, perPage: 0, maxCols: 3 },
+  tabula:        { cols: 1, perPage: 0, maxCols: 3 },
+  editoriale:    { cols: 1, perPage: 2, maxCols: 1 },
+  diario:        { cols: 1, perPage: 3, maxCols: 1 },
+  listino:       { cols: 2, perPage: 0, maxCols: 6 }
+};
+
+const gridOf = (menu, variant) => {
+  const def = GRID_DEFAULTS[variant] || { cols: 1, perPage: 0, maxCols: 1 };
+  const g = (menu && menu.grid && menu.grid[variant]) || {};
+  // Compat: vecchia chiave globale menu.cols (un tempo usata solo dal Listino)
+  const legacy = (variant === "listino" && !g.cols && menu && menu.cols) ? menu.cols : 0;
+  const cols = Math.max(1, Math.min(def.maxCols, g.cols || legacy || def.cols));
+  const perPage = Math.max(0, (g.perPage === 0 || g.perPage) ? g.perPage : def.perPage);
+  return { cols, perPage, maxCols: def.maxCols };
+};
+
+// Stile per attivare le colonne CSS su un contenitore di piatti.
+const colStyle = (cols) => (cols > 1) ? { display: "block", columnCount: cols, columnGap: "10mm" } : undefined;
+
+// Pesi stimati per l'impaginazione automatica (≈ voci per colonna per pagina).
+// Valori conservativi: meglio una voce in meno che sbordare dal foglio A4.
+const WEIGHTS = {
+  classico:      { perCol: 6,   of: (d,i,l)=> 1 + (((d.desc||"").length > 70) ? 0.6 : 0) + (startsSection(l,i) ? 1 : 0) },
+  contemporaneo: { perCol: 7,   of: (d,i,l)=> 1 + (((d.desc||"").length > 80) ? 0.5 : 0) + (startsSection(l,i) ? 0.8 : 0) },
+  tabula:        { perCol: 8, firstPerCol: 4.5, of: (d,i,l)=> 1 + (((d.desc||"").length > 80) ? 0.5 : 0) + (startsSection(l,i) ? 0.8 : 0) },
+  editoriale:    { perCol: 2,   of: ()=> 1 },
+  diario:        { perCol: 3.4, of: (d,i,l)=> 1 + (((d.story||"").length > 200) ? 0.6 : 0) + (startsSection(l,i) ? 0.4 : 0) }
+};
+
+// Spezza la lista dei piatti in pagine → [{ start, items }].
+// start = indice globale del primo piatto (serve a numerazione e sezioni).
+function paginateDishes(dishes, cols, perPage, weight){
+  const list = dishes || [];
+  if (!list.length) return [{ start: 0, items: [] }];
+  const pages = [];
+  if (perPage > 0){
+    for (let i = 0; i < list.length; i += perPage) pages.push({ start: i, items: list.slice(i, i + perPage) });
+    return pages;
+  }
+  const w = weight || { perCol: 12, of: ()=> 1 };
+  const capAt = (pi) => Math.max(1, cols) * ((pi === 0 && w.firstPerCol) ? w.firstPerCol : (w.perCol || 12));
+  let start = 0, curW = 0;
+  for (let i = 0; i < list.length; i++){
+    const dw = w.of(list[i], i, list);
+    if (i > start && curW + dw > capAt(pages.length)){ pages.push({ start, items: list.slice(start, i) }); start = i; curW = 0; }
+    curW += dw;
+  }
+  pages.push({ start, items: list.slice(start) });
+  return pages;
+}
+
 // ---- Utility ----
 const formatDate = (iso) => {
   if (!iso) return "";
@@ -242,6 +305,8 @@ function MenuClassico({ menu, client }) {
   const coast = C.decor === "coast";
   const portate = menu.dishes.length;
   const L = layoutOf(menu, "classico");
+  const { cols, perPage } = gridOf(menu, "classico");
+  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.classico);
   return (
     <div className="sheet sheet-classico" data-client={C.id} data-screen-label="Menu Classico">
       <div className="page-A4 cover-page-c">
@@ -275,47 +340,57 @@ function MenuClassico({ menu, client }) {
         </div>
       </div>
 
-      <div className="page-A4 inner-page-c">
-        <div className="inner-head-c">
-          <div className="inner-wm-c"><Brand client={C} className="brand-sm" /></div>
-          <div className="inner-menu-name-c">— {menu.name} —</div>
-        </div>
-
-        <div className="dishes-c">
-          {menu.dishes.map((d, i) => (
-            <React.Fragment key={i}>
-              {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="c" />}
-              <div className="dish-c">
-                <div className="dish-num-c">{courseNumber(i)}</div>
-                <h3 className="dish-name-c">
-                  {d.name || <span className="placeholder-c">Nome del piatto</span>}
-                  <DishPrice value={d.price} />
-                  <AllergensInline list={d.allergens} />
-                </h3>
-                {d.desc && <p className="dish-desc-c">{d.desc}</p>}
-                {i < menu.dishes.length - 1 && !startsSection(menu.dishes, i + 1) && (
-                  <div className="dish-sep-c">
-                    <span></span><em>·</em><span></span>
-                  </div>
-                )}
-              </div>
-            </React.Fragment>
-          ))}
-        </div>
-
-        <div className="inner-footer-c">
-          <div className="allergens-legend-c">
-            <div className="legend-title-c">— Allergeni —</div>
-            <div className="legend-list-c">
-              {ALLERGENI.map(a => (
-                <span key={a.n} className="legend-item-c">
-                  <span className="legend-n">{a.n}</span> {a.label}
-                </span>
-              ))}
+      {pages.map((pg, pi) => (
+        <div className="page-A4 inner-page-c" key={pi}>
+          <div className="inner-head-c">
+            <div className="inner-wm-c"><Brand client={C} className="brand-sm" /></div>
+            <div className="inner-menu-name-c">
+              — {menu.name} —
+              {pages.length > 1 && <span className="inner-folio-c"> · {romanize(pi + 1)}/{romanize(pages.length)}</span>}
             </div>
           </div>
+
+          <div className="dishes-c" style={colStyle(cols)}>
+            {pg.items.map((d, idx) => {
+              const i = pg.start + idx;
+              return (
+                <React.Fragment key={i}>
+                  {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="c" />}
+                  <div className="dish-c">
+                    <div className="dish-num-c">{courseNumber(i)}</div>
+                    <h3 className="dish-name-c">
+                      {d.name || <span className="placeholder-c">Nome del piatto</span>}
+                      <DishPrice value={d.price} />
+                      <AllergensInline list={d.allergens} />
+                    </h3>
+                    {d.desc && <p className="dish-desc-c">{d.desc}</p>}
+                    {idx < pg.items.length - 1 && !startsSection(menu.dishes, i + 1) && (
+                      <div className="dish-sep-c">
+                        <span></span><em>·</em><span></span>
+                      </div>
+                    )}
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </div>
+
+          {pi === pages.length - 1 && (
+            <div className="inner-footer-c">
+              <div className="allergens-legend-c">
+                <div className="legend-title-c">— Allergeni —</div>
+                <div className="legend-list-c">
+                  {ALLERGENI.map(a => (
+                    <span key={a.n} className="legend-item-c">
+                      <span className="legend-n">{a.n}</span> {a.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      ))}
     </div>
   );
 }
@@ -329,6 +404,8 @@ function MenuContemporaneo({ menu, client }) {
   const hasLogo = C.logo && C.logo.type === "image";
   const portate = menu.dishes.length;
   const L = layoutOf(menu, "contemporaneo");
+  const { cols, perPage } = gridOf(menu, "contemporaneo");
+  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.contemporaneo);
   return (
     <div className="sheet sheet-contemporaneo" data-client={C.id} data-screen-label="Menu Contemporaneo">
       <div className="page-A4 cover-page-m">
@@ -369,40 +446,45 @@ function MenuContemporaneo({ menu, client }) {
         </div>
       </div>
 
-      <div className="page-A4 inner-page-m">
-        <div className="inner-top-m">
-          <span className="inner-wm-m"><Brand client={C} className="brand-sm" /></span>
-          <span className="inner-name-m">{menu.name} · {courseNumber(portate-1)} portate</span>
-        </div>
-
-        <div className="dishes-m">
-          {menu.dishes.map((d, i) => (
-            <React.Fragment key={i}>
-              {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="m" />}
-              <div className="dish-m">
-                <div className="dish-left-m">
-                  <div className="dish-num-m">{courseNumber(i)}</div>
-                </div>
-                <div className="dish-body-m">
-                  <h3 className="dish-name-m">
-                    {d.name || <span className="placeholder-m">Nome del piatto</span>}
-                    <DishPrice value={d.price} />
-                    <AllergensInline list={d.allergens} />
-                  </h3>
-                  {d.desc && <p className="dish-desc-m">{d.desc}</p>}
-                </div>
-              </div>
-            </React.Fragment>
-          ))}
-        </div>
-
-        <div className="inner-foot-m">
-          <div className="legend-m">
-            <AllergensLegend />
+      {pages.map((pg, pi) => (
+        <div className="page-A4 inner-page-m" key={pi}>
+          <div className="inner-top-m">
+            <span className="inner-wm-m"><Brand client={C} className="brand-sm" /></span>
+            <span className="inner-name-m">{menu.name} · {courseNumber(portate-1)} portate</span>
           </div>
-          <div className="folio-m">II</div>
+
+          <div className="dishes-m" style={colStyle(cols)}>
+            {pg.items.map((d, idx) => {
+              const i = pg.start + idx;
+              return (
+                <React.Fragment key={i}>
+                  {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="m" />}
+                  <div className="dish-m">
+                    <div className="dish-left-m">
+                      <div className="dish-num-m">{courseNumber(i)}</div>
+                    </div>
+                    <div className="dish-body-m">
+                      <h3 className="dish-name-m">
+                        {d.name || <span className="placeholder-m">Nome del piatto</span>}
+                        <DishPrice value={d.price} />
+                        <AllergensInline list={d.allergens} />
+                      </h3>
+                      {d.desc && <p className="dish-desc-m">{d.desc}</p>}
+                    </div>
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </div>
+
+          <div className="inner-foot-m">
+            <div className="legend-m">
+              {pi === pages.length - 1 && <AllergensLegend />}
+            </div>
+            <div className="folio-m">{romanize(pi + 2)}</div>
+          </div>
         </div>
-      </div>
+      ))}
     </div>
   );
 }
@@ -414,51 +496,65 @@ function MenuTabula({ menu, client }) {
   const C = useClient(client);
   const coast = C.decor === "coast";
   const portate = menu.dishes.length;
+  const { cols, perPage } = gridOf(menu, "tabula");
+  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.tabula);
   return (
     <div className="sheet sheet-tabula" data-client={C.id} data-screen-label="Menu Tabula">
-      <div className="page-A4 tabula-page">
-        <div className="tab-head">
-          <div className="tab-wm"><Brand client={C} className="brand-sm" /></div>
-          <div className="tab-meta">
-            <span>— menu {menu.category} —</span>
-            <span>{formatDate(menu.date)}</span>
+      {pages.map((pg, pi) => (
+        <div className={"page-A4 tabula-page" + (pi === 0 ? "" : " tabula-page-cont")} key={pi}>
+          <div className="tab-head">
+            <div className="tab-wm"><Brand client={C} className="brand-sm" /></div>
+            <div className="tab-meta">
+              <span>— menu {menu.category} —</span>
+              <span>{formatDate(menu.date)}</span>
+            </div>
           </div>
-        </div>
 
-        <div className="tab-title">
-          <h1 className="tab-name">{menu.name || "—"}</h1>
-          <div className="tab-rule"></div>
-          {coast && <CoastWave className="tab-wave" />}
-          <div className="tab-stats">
-            <span>{courseNumber(portate-1)} portate</span>
-            <span className="dot-sep">·</span>
-            <span>{formatPrice(menu.price)}</span>
-            <span className="dot-sep">·</span>
-            <span>{menu.seats} posti</span>
-          </div>
-        </div>
-
-        <div className="tab-dishes">
-          {menu.dishes.map((d, i) => (
-            <React.Fragment key={i}>
-              {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="t" />}
-              <div className="tab-dish">
-                <h3 className="tab-dish-name">
-                  {d.name || <span className="placeholder-m">Nome del piatto</span>}
-                  <DishPrice value={d.price} />
-                  <AllergensInline list={d.allergens} />
-                </h3>
-                {d.desc && <div className="tab-dish-desc">{d.desc}</div>}
-                {i < menu.dishes.length - 1 && !startsSection(menu.dishes, i + 1) && <div className="tab-sep"></div>}
+          {pi === 0 ? (
+            <div className="tab-title">
+              <h1 className="tab-name">{menu.name || "—"}</h1>
+              <div className="tab-rule"></div>
+              {coast && <CoastWave className="tab-wave" />}
+              <div className="tab-stats">
+                <span>{courseNumber(portate-1)} portate</span>
+                <span className="dot-sep">·</span>
+                <span>{formatPrice(menu.price)}</span>
+                <span className="dot-sep">·</span>
+                <span>{menu.seats} posti</span>
               </div>
-            </React.Fragment>
-          ))}
-        </div>
+            </div>
+          ) : (
+            <div className="tab-title-cont">
+              <span className="tab-name-cont">{menu.name || "—"}</span>
+              <span className="tab-folio-cont">{romanize(pi + 1)} / {romanize(pages.length)}</span>
+            </div>
+          )}
 
-        <div className="tab-foot">
-          <AllergensLegend className="tab-legend" />
+          <div className="tab-dishes" style={colStyle(cols)}>
+            {pg.items.map((d, idx) => {
+              const i = pg.start + idx;
+              return (
+                <React.Fragment key={i}>
+                  {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="t" />}
+                  <div className="tab-dish">
+                    <h3 className="tab-dish-name">
+                      {d.name || <span className="placeholder-m">Nome del piatto</span>}
+                      <DishPrice value={d.price} />
+                      <AllergensInline list={d.allergens} />
+                    </h3>
+                    {d.desc && <div className="tab-dish-desc">{d.desc}</div>}
+                    {idx < pg.items.length - 1 && !startsSection(menu.dishes, i + 1) && <div className="tab-sep"></div>}
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </div>
+
+          <div className="tab-foot">
+            {pi === pages.length - 1 && <AllergensLegend className="tab-legend" />}
+          </div>
         </div>
-      </div>
+      ))}
     </div>
   );
 }
@@ -470,11 +566,9 @@ function MenuTabula({ menu, client }) {
 function MenuEditoriale({ menu, client }) {
   const C = useClient(client);
   const portate = menu.dishes.length;
-  // Group dishes 2 per inner page
-  const pages = [];
-  for (let i = 0; i < menu.dishes.length; i += 2){
-    pages.push(menu.dishes.slice(i, i + 2));
-  }
+  // Voci per pagina configurabili (default 2). Le pagine si creano da sole.
+  const { perPage } = gridOf(menu, "editoriale");
+  const pages = paginateDishes(menu.dishes, 1, perPage, WEIGHTS.editoriale);
 
   // Find a hero image (first dish with image, otherwise null → placeholder)
   const heroSrc = menu.dishes.find(d => d.image)?.image || null;
@@ -521,8 +615,8 @@ function MenuEditoriale({ menu, client }) {
           </div>
 
           <div className="ed-page-body">
-            {group.map((d, idx) => {
-              const i = pIdx * 2 + idx;
+            {group.items.map((d, idx) => {
+              const i = group.start + idx;
               return (
                 <React.Fragment key={i}>
                 {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="ed" />}
@@ -577,12 +671,9 @@ function MenuEditoriale({ menu, client }) {
 function MenuDiario({ menu, client }) {
   const C = useClient(client);
   const portate = menu.dishes.length;
-  // Group dishes 3 per inner page (varies based on story length, but 3 fits)
-  const perPage = 3;
-  const pages = [];
-  for (let i = 0; i < menu.dishes.length; i += perPage){
-    pages.push(menu.dishes.slice(i, i + perPage));
-  }
+  // Voci per pagina configurabili (default 3). Le pagine si creano da sole.
+  const { perPage } = gridOf(menu, "diario");
+  const pages = paginateDishes(menu.dishes, 1, perPage, WEIGHTS.diario);
 
   return (
     <div className="sheet sheet-diario" data-client={C.id} data-screen-label="Menu Diario">
@@ -623,8 +714,8 @@ function MenuDiario({ menu, client }) {
           </div>
 
           <div className="dr-entries">
-            {group.map((d, idx) => {
-              const i = pIdx * perPage + idx;
+            {group.items.map((d, idx) => {
+              const i = group.start + idx;
               return (
                 <React.Fragment key={i}>
                 {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="dr" />}
@@ -658,13 +749,13 @@ function MenuDiario({ menu, client }) {
 
 // ============================================================
 // VI — MENU LISTINO  (denso, multi-colonna, multi-pagina · stile listino-bar)
-// Colonne 1/2/3 (menu.cols) via column-count; le pagine A4 si creano da sole
-// impacchettando le sezioni per "peso" stimato. Avvicina lo stile al menù PDF.
+// Colonne (fino a 6) via column-count; le pagine A4 si creano da sole
+// impacchettando le sezioni per "peso" o per "voci per pagina". Stile menù PDF.
 // ============================================================
 function MenuListino({ menu, client }) {
   const C = useClient(client);
   const coast = C.decor === "coast";
-  const cols = Math.min(3, Math.max(1, menu.cols || 2));
+  const { cols, perPage } = gridOf(menu, "listino");
 
   // Raggruppa i piatti per sezione, mantenendo l'ordine
   const groups = [];
@@ -675,19 +766,22 @@ function MenuListino({ menu, client }) {
     g.items.push(d);
   });
 
-  // Peso stimato di ogni gruppo → impacchetta i gruppi in pagine A4 (conservativo)
+  // Impacchetta i gruppi (sezioni intere) nelle pagine A4. Nessun tetto:
+  // le pagine crescono col contenuto. perPage>0 → tetto di voci per pagina
+  // scelto dall'utente; perPage 0 → automatico per "peso" stimato.
   const wDish = d => 1 + (((d.desc || "").length > 44) ? 0.6 : 0);
   const wGroup = g => (g.section ? 1 : 0) + g.items.reduce((s, d) => s + wDish(d), 0);
-  const PER_COL = 20;
-  const budget = cols * PER_COL;
+  const budget = perPage > 0 ? perPage : cols * 20;
+  const measure = perPage > 0 ? (g => g.items.length) : wGroup;
   const pages = [];
   let cur = [], curW = 0;
   groups.forEach(g => {
-    const w = wGroup(g);
+    const w = measure(g);
     if (cur.length && curW + w > budget) { pages.push(cur); cur = []; curW = 0; }
     cur.push(g); curW += w;
   });
   if (cur.length) pages.push(cur);
+  if (!pages.length) pages.push([]);
 
   return (
     <div className="sheet sheet-listino" data-client={C.id} data-screen-label="Menu Listino">
@@ -749,5 +843,6 @@ function romanize(n){
 Object.assign(window, {
   MenuClassico, MenuContemporaneo, MenuTabula, MenuEditoriale, MenuDiario, MenuListino,
   Brand, DishPrice, CoastWave, Citrus, Draggable, DragCtx,
-  formatDate, formatPrice, ALLERGENI
+  formatDate, formatPrice, ALLERGENI,
+  GRID_DEFAULTS, gridOf, paginateDishes, WEIGHTS, colStyle
 });
