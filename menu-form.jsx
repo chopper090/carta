@@ -89,6 +89,32 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
     });
   };
 
+  // Gruppi di sezioni consecutive (unità per lo spostamento in blocco)
+  const groupsOf = (dishes) => {
+    const groups = [];
+    (dishes || []).forEach((d, i) => {
+      const sec = d.section || "";
+      let g = groups[groups.length - 1];
+      if (!g || g.sec !== sec) { g = { sec, idxs: [] }; groups.push(g); }
+      g.idxs.push(i);
+    });
+    return groups;
+  };
+  const sectionGroupsUI = groupsOf(menu.dishes);
+
+  // Sposta un'intera sezione (con tutti i suoi piatti) su/giù, scambiandola
+  // con la sezione adiacente.
+  const moveSection = (gi, dir) => {
+    setMenu(prev => {
+      const groups = groupsOf(prev.dishes);
+      const j = gi + dir;
+      if (j < 0 || j >= groups.length) return prev;
+      [groups[gi], groups[j]] = [groups[j], groups[gi]];
+      const dishes = groups.flatMap(g => g.idxs.map(k => prev.dishes[k]));
+      return { ...prev, dishes };
+    });
+  };
+
   const handleImageUpload = (i, file) => {
     if (!file) return;
     const reader = new FileReader();
@@ -202,12 +228,22 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
           </div>
         </div>
 
+        <div className="pp-sublabel">Sezioni</div>
+        <button type="button"
+          className={"section-break-toggle " + (grid.sectionBreak ? "active" : "")}
+          onClick={() => setGrid({ sectionBreak: !grid.sectionBreak })}
+          aria-pressed={!!grid.sectionBreak}>
+          <span className="sbt-check">{grid.sectionBreak ? "✓" : ""}</span>
+          <span className="sbt-label">Ogni sezione su una pagina nuova</span>
+        </button>
+
         <p className="cols-hint">
           {gridDef.maxCols > 1
             ? "Più colonne = più compatto. "
             : ""}
           Con <strong>Auto</strong> le pagine A4 si creano da sole in base al contenuto — nessun limite.
           Imposta un numero per fissare quante voci stanno in ogni pagina.
+          {" "}Con <strong>«sezione su pagina nuova»</strong> ogni sezione ricomincia da un foglio pulito.
         </p>
       </div>
 
@@ -305,21 +341,39 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
           {sectionNames.map(s => <option key={s} value={s} />)}
         </datalist>
         <div className="dishes-form">
-          {menu.dishes.map((d, i) => (
-            <DishEditor
-              key={i}
-              i={i}
-              dish={d}
-              total={menu.dishes.length}
-              isNarrative={isNarrative}
-              isImage={isImage}
-              onChange={(field, value) => updateDish(i, field, value)}
-              onToggleAllergen={(n) => toggleAllergen(i, n)}
-              onMove={(dir) => moveDish(i, dir)}
-              onRemove={() => removeDish(i)}
-              onImageUpload={(f) => handleImageUpload(i, f)}
-              onImageRemove={() => removeImage(i)}
-            />
+          {sectionGroupsUI.map((g, gi) => (
+            <React.Fragment key={gi}>
+              <div className="section-move-row">
+                <span className="section-move-name">
+                  {g.sec || <em className="section-move-none">senza sezione</em>}
+                  <span className="section-move-count">· {g.idxs.length}</span>
+                </span>
+                <div className="section-move-ctrls">
+                  <button type="button" className="ctrl-btn" disabled={gi === 0}
+                    onClick={() => moveSection(gi, -1)}
+                    title="Sposta la sezione su" aria-label="Sposta la sezione su">↑</button>
+                  <button type="button" className="ctrl-btn" disabled={gi === sectionGroupsUI.length - 1}
+                    onClick={() => moveSection(gi, 1)}
+                    title="Sposta la sezione giù" aria-label="Sposta la sezione giù">↓</button>
+                </div>
+              </div>
+              {g.idxs.map(i => (
+                <DishEditor
+                  key={i}
+                  i={i}
+                  dish={menu.dishes[i]}
+                  total={menu.dishes.length}
+                  isNarrative={isNarrative}
+                  isImage={isImage}
+                  onChange={(field, value) => updateDish(i, field, value)}
+                  onToggleAllergen={(n) => toggleAllergen(i, n)}
+                  onMove={(dir) => moveDish(i, dir)}
+                  onRemove={() => removeDish(i)}
+                  onImageUpload={(f) => handleImageUpload(i, f)}
+                  onImageRemove={() => removeImage(i)}
+                />
+              ))}
+            </React.Fragment>
           ))}
         </div>
       </div>

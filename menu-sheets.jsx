@@ -148,7 +148,8 @@ const gridOf = (menu, variant) => {
   const legacy = (variant === "listino" && !g.cols && menu && menu.cols) ? menu.cols : 0;
   const cols = Math.max(1, Math.min(def.maxCols, g.cols || legacy || def.cols));
   const perPage = Math.max(0, (g.perPage === 0 || g.perPage) ? g.perPage : def.perPage);
-  return { cols, perPage, maxCols: def.maxCols };
+  const sectionBreak = !!g.sectionBreak;   // ogni sezione parte da una pagina nuova
+  return { cols, perPage, maxCols: def.maxCols, sectionBreak };
 };
 
 // Stile per attivare le colonne CSS su un contenitore di piatti.
@@ -156,19 +157,19 @@ const colStyle = (cols) => (cols > 1) ? { display: "block", columnCount: cols, c
 
 // Pesi stimati per l'impaginazione automatica (≈ voci per colonna per pagina).
 // Valori conservativi: meglio una voce in meno che sbordare dal foglio A4.
+// peso descrizione a gradini (0 / 0.6 / 1.2) — le descrizioni multi-riga pesano di più
+const descW = (s, a, b) => { const n = (s || "").length; return n > b ? 1.2 : (n > a ? 0.6 : 0); };
 const WEIGHTS = {
-  classico:      { perCol: 6,   of: (d,i,l)=> 1 + (((d.desc||"").length > 70) ? 0.6 : 0) + (startsSection(l,i) ? 1 : 0) },
-  contemporaneo: { perCol: 7,   of: (d,i,l)=> 1 + (((d.desc||"").length > 80) ? 0.5 : 0) + (startsSection(l,i) ? 0.8 : 0) },
-  tabula:        { perCol: 8, firstPerCol: 4.5, of: (d,i,l)=> 1 + (((d.desc||"").length > 80) ? 0.5 : 0) + (startsSection(l,i) ? 0.8 : 0) },
+  classico:      { perCol: 5,   of: (d,i,l)=> 1 + descW(d.desc, 55, 100) + (startsSection(l,i) ? 1.3 : 0) },
+  contemporaneo: { perCol: 7,   of: (d,i,l)=> 1 + descW(d.desc, 70, 130) + (startsSection(l,i) ? 0.9 : 0) },
+  tabula:        { perCol: 7, firstPerCol: 4.5, of: (d,i,l)=> 1 + descW(d.desc, 65, 120) + (startsSection(l,i) ? 1 : 0) },
   editoriale:    { perCol: 2,   of: ()=> 1 },
   diario:        { perCol: 3.4, of: (d,i,l)=> 1 + (((d.story||"").length > 200) ? 0.6 : 0) + (startsSection(l,i) ? 0.4 : 0) }
 };
 
-// Spezza la lista dei piatti in pagine → [{ start, items }].
-// start = indice globale del primo piatto (serve a numerazione e sezioni).
-function paginateDishes(dishes, cols, perPage, weight){
-  const list = dishes || [];
-  if (!list.length) return [{ start: 0, items: [] }];
+// Impacchetta una lista (già omogenea) in pagine → [{ start, items }],
+// start = indice del primo piatto RELATIVO alla lista passata.
+function _packPages(list, cols, perPage, weight){
   const pages = [];
   if (perPage > 0){
     for (let i = 0; i < list.length; i += perPage) pages.push({ start: i, items: list.slice(i, i + perPage) });
@@ -184,6 +185,36 @@ function paginateDishes(dishes, cols, perPage, weight){
   }
   pages.push({ start, items: list.slice(start) });
   return pages;
+}
+
+// Raggruppa i piatti per sezione consecutiva → [{ sec, start, items }].
+function sectionGroups(list){
+  const groups = [];
+  (list || []).forEach((d, i) => {
+    const sec = d.section || "";
+    let g = groups[groups.length - 1];
+    if (!g || g.sec !== sec){ g = { sec, start: i, items: [] }; groups.push(g); }
+    g.items.push(d);
+  });
+  return groups;
+}
+
+// Spezza la lista dei piatti in pagine → [{ start, items }].
+// start = indice globale del primo piatto (serve a numerazione e sezioni).
+// sectionBreak: ogni sezione parte da una pagina nuova (e ne occupa quante servono).
+function paginateDishes(dishes, cols, perPage, weight, sectionBreak){
+  const list = dishes || [];
+  if (!list.length) return [{ start: 0, items: [] }];
+  if (!sectionBreak){
+    const p = _packPages(list, cols, perPage, weight);
+    return p.length ? p : [{ start: 0, items: [] }];
+  }
+  const pages = [];
+  sectionGroups(list).forEach(g => {
+    _packPages(g.items, cols, perPage, weight).forEach(p =>
+      pages.push({ start: g.start + p.start, items: p.items }));
+  });
+  return pages.length ? pages : [{ start: 0, items: [] }];
 }
 
 // ---- Utility ----
@@ -305,8 +336,8 @@ function MenuClassico({ menu, client }) {
   const coast = C.decor === "coast";
   const portate = menu.dishes.length;
   const L = layoutOf(menu, "classico");
-  const { cols, perPage } = gridOf(menu, "classico");
-  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.classico);
+  const { cols, perPage, sectionBreak } = gridOf(menu, "classico");
+  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.classico, sectionBreak);
   return (
     <div className="sheet sheet-classico" data-client={C.id} data-screen-label="Menu Classico">
       <div className="page-A4 cover-page-c">
@@ -404,8 +435,8 @@ function MenuContemporaneo({ menu, client }) {
   const hasLogo = C.logo && C.logo.type === "image";
   const portate = menu.dishes.length;
   const L = layoutOf(menu, "contemporaneo");
-  const { cols, perPage } = gridOf(menu, "contemporaneo");
-  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.contemporaneo);
+  const { cols, perPage, sectionBreak } = gridOf(menu, "contemporaneo");
+  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.contemporaneo, sectionBreak);
   return (
     <div className="sheet sheet-contemporaneo" data-client={C.id} data-screen-label="Menu Contemporaneo">
       <div className="page-A4 cover-page-m">
@@ -496,8 +527,8 @@ function MenuTabula({ menu, client }) {
   const C = useClient(client);
   const coast = C.decor === "coast";
   const portate = menu.dishes.length;
-  const { cols, perPage } = gridOf(menu, "tabula");
-  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.tabula);
+  const { cols, perPage, sectionBreak } = gridOf(menu, "tabula");
+  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.tabula, sectionBreak);
   return (
     <div className="sheet sheet-tabula" data-client={C.id} data-screen-label="Menu Tabula">
       {pages.map((pg, pi) => (
@@ -567,8 +598,8 @@ function MenuEditoriale({ menu, client }) {
   const C = useClient(client);
   const portate = menu.dishes.length;
   // Voci per pagina configurabili (default 2). Le pagine si creano da sole.
-  const { perPage } = gridOf(menu, "editoriale");
-  const pages = paginateDishes(menu.dishes, 1, perPage, WEIGHTS.editoriale);
+  const { perPage, sectionBreak } = gridOf(menu, "editoriale");
+  const pages = paginateDishes(menu.dishes, 1, perPage, WEIGHTS.editoriale, sectionBreak);
 
   // Find a hero image (first dish with image, otherwise null → placeholder)
   const heroSrc = menu.dishes.find(d => d.image)?.image || null;
@@ -672,8 +703,8 @@ function MenuDiario({ menu, client }) {
   const C = useClient(client);
   const portate = menu.dishes.length;
   // Voci per pagina configurabili (default 3). Le pagine si creano da sole.
-  const { perPage } = gridOf(menu, "diario");
-  const pages = paginateDishes(menu.dishes, 1, perPage, WEIGHTS.diario);
+  const { perPage, sectionBreak } = gridOf(menu, "diario");
+  const pages = paginateDishes(menu.dishes, 1, perPage, WEIGHTS.diario, sectionBreak);
 
   return (
     <div className="sheet sheet-diario" data-client={C.id} data-screen-label="Menu Diario">
@@ -755,7 +786,7 @@ function MenuDiario({ menu, client }) {
 function MenuListino({ menu, client }) {
   const C = useClient(client);
   const coast = C.decor === "coast";
-  const { cols, perPage } = gridOf(menu, "listino");
+  const { cols, perPage, sectionBreak } = gridOf(menu, "listino");
 
   // Raggruppa i piatti per sezione, mantenendo l'ordine
   const groups = [];
@@ -766,21 +797,32 @@ function MenuListino({ menu, client }) {
     g.items.push(d);
   });
 
-  // Impacchetta i gruppi (sezioni intere) nelle pagine A4. Nessun tetto:
-  // le pagine crescono col contenuto. perPage>0 → tetto di voci per pagina
-  // scelto dall'utente; perPage 0 → automatico per "peso" stimato.
+  // Impacchetta le sezioni nelle pagine A4. Nessun tetto: le pagine crescono
+  // col contenuto. perPage>0 → tetto di voci per pagina; perPage 0 → auto per "peso".
+  // sectionBreak → ogni sezione parte da una pagina nuova (mai unite tra loro).
   const wDish = d => 1 + (((d.desc || "").length > 44) ? 0.6 : 0);
   const wGroup = g => (g.section ? 1 : 0) + g.items.reduce((s, d) => s + wDish(d), 0);
-  const budget = perPage > 0 ? perPage : cols * 20;
-  const measure = perPage > 0 ? (g => g.items.length) : wGroup;
   const pages = [];
-  let cur = [], curW = 0;
-  groups.forEach(g => {
-    const w = measure(g);
-    if (cur.length && curW + w > budget) { pages.push(cur); cur = []; curW = 0; }
-    cur.push(g); curW += w;
-  });
-  if (cur.length) pages.push(cur);
+  if (sectionBreak){
+    groups.forEach(g => {
+      if (perPage > 0 && g.items.length > perPage){
+        for (let i = 0; i < g.items.length; i += perPage)
+          pages.push([{ section: g.section, items: g.items.slice(i, i + perPage) }]);
+      } else {
+        pages.push([g]);
+      }
+    });
+  } else {
+    const budget = perPage > 0 ? perPage : cols * 20;
+    const measure = perPage > 0 ? (g => g.items.length) : wGroup;
+    let cur = [], curW = 0;
+    groups.forEach(g => {
+      const w = measure(g);
+      if (cur.length && curW + w > budget) { pages.push(cur); cur = []; curW = 0; }
+      cur.push(g); curW += w;
+    });
+    if (cur.length) pages.push(cur);
+  }
   if (!pages.length) pages.push([]);
 
   return (
@@ -844,5 +886,5 @@ Object.assign(window, {
   MenuClassico, MenuContemporaneo, MenuTabula, MenuEditoriale, MenuDiario, MenuListino,
   Brand, DishPrice, CoastWave, Citrus, Draggable, DragCtx,
   formatDate, formatPrice, ALLERGENI,
-  GRID_DEFAULTS, gridOf, paginateDishes, WEIGHTS, colStyle
+  GRID_DEFAULTS, gridOf, paginateDishes, WEIGHTS, colStyle, sectionGroups
 });

@@ -223,6 +223,8 @@ const BARETTO_CLASSICI = {
   ]
 };
 
+const CUC = (name, section, desc, allergens) => ({ name, section, desc, story: "", image: null, price: null, allergens });
+
 const BARETTO_CUCINA = {
   name: "Cucina",
   category: "food",
@@ -233,43 +235,43 @@ const BARETTO_CUCINA = {
   chefNote: "La cucina del baretto: dalla piazzetta agli sfizi, dai buns ai piatti. Mare, agrumi e Sicilia.",
   dishes: [
     // — Piazzetta —
-    { name: "Piazzetta", section: "Piazzetta", desc: "mandorle salate, arachidi, ceci, pinzimonio (carote, cetrioli, daikon, peperoni), vinaigrette o citronette", story: "", image: null, price: null, allergens: [5, 8] },
+    CUC("Piazzetta", "Piazzetta", "arachidi, ceci, pinzimonio (carote, cetrioli) + vinaigrette/citronette", [5, 8]),
 
-    // — Salse · accompagnamento nachos / crostoni —
-    { name: "Tzatziki", section: "Salse", desc: "yogurt, cetriolo, aglio, menta, olio", story: "", image: null, price: null, allergens: [7] },
-    { name: "Hummus", section: "Salse", desc: "ceci, tahina, succo di lime, paprika, aglio, olio", story: "", image: null, price: null, allergens: [11] },
-    { name: "Guacamole", section: "Salse", desc: "avocado, cipolla, cumino, coriandolo, pomodoro, succo di lime", story: "", image: null, price: null, allergens: [] },
-    { name: "Alpino", section: "Salse", desc: "rucola, caprino, mandorle, sale, pepe nero, olio", story: "", image: null, price: null, allergens: [7, 8] },
+    // — Salse —
+    CUC("Tzatziki", "Salse", "yogurt, cetriolo, aglio, menta, olio, sale", [7]),
+    CUC("Hummus", "Salse", "ceci, tahina, succo di lime, paprika, aglio, olio, sale", [11]),
+    CUC("Guacamole", "Salse", "avocado, succo di lime, cipolla, pomodoro, sale, peperoncino", []),
+    CUC("Alpino", "Salse", "rucola, caprino, mandorle, sale, pepe nero, olio", [7, 8]),
 
     // — Buns —
-    { name: "Classicone", section: "Buns", desc: "mortadella, limone, pepe", story: "", image: null, price: null, allergens: [1] },
-    { name: "Little Tonny", section: "Buns", desc: "tartare di tonno con agrumi, zenzero e capperi, salsa yogurt con jalapeño verde, provola affumicata, valeriana", story: "", image: null, price: null, allergens: [1, 4, 7] },
-    { name: "Pa-nino", section: "Buns", desc: "controfiletto di manzo (cbt), composta di cipolle, rucola, scaglie di parmigiano, salsa mayo e senape", story: "", image: null, price: null, allergens: [1, 3, 7, 10] },
-    { name: "Vegburger", section: "Buns", desc: "hamburger vegano — ricetta da definire", story: "", image: null, price: null, allergens: [1] },
+    CUC("Classicone", "Buns", "mortadella, limone, pepe", [1]),
+    CUC("Little Tonny", "Buns", "tartare di tonno con agrumi, zenzero e capperi, salsa yogurt con jalapeño verde, provola affumicata, valeriana", [1, 4, 7]),
+    CUC("Pa-nino", "Buns", "controfiletto di manzo (cbt), composta di cipolle, rucola, scaglie di parmigiano, salsa mayo e senape", [1, 3, 7, 10]),
+    CUC("Vegburger", "Buns", "hamburger vegano — ricetta da definire", [1]),
 
     // — Crostoni —
-    { name: "Burro alle erbe e alici", section: "Crostoni", desc: "crostone, burro alle erbe montato, alici", story: "", image: null, price: null, allergens: [1, 4, 7] },
-    { name: "Baccalà mantecato", section: "Crostoni", desc: "crostone, baccalà mantecato", story: "", image: null, price: null, allergens: [1, 4] },
+    CUC("Burro alle erbe e alici", "Crostoni", "Pane tostato, burro montato con erbe aromatiche, acciuga del Cantabrico, zesti di limone", [1, 4, 7]),
+    CUC("Baccalà mantecato", "Crostoni", "Pane tostato, baccalà mantecato, erba cipollina", [1, 4]),
 
     // — Sfizi —
-    { name: "Fish & Chips", section: "Sfizi", desc: "pesce in pastella, salsa tartara", story: "", image: null, price: null, allergens: [1, 3, 4] },
-    { name: "Panella e tartare di carne", section: "Sfizi", desc: "panella, tartare di carne, maionese di cappero e ravanelli, acciuga, tuorlo marinato", story: "", image: null, price: null, allergens: [3, 4] },
-    { name: "Scagghiozza", section: "Sfizi", desc: "salsa verde, lingua o alici (da confermare)", story: "", image: null, price: null, allergens: [4] },
-    { name: "Falafel", section: "Sfizi", desc: "ceci, spezie, erbe", story: "", image: null, price: null, allergens: [] },
-    { name: "Mix", section: "Sfizi", desc: "selezione di sfizi", story: "", image: null, price: null, allergens: [] },
+    CUC("Fish & Chips", "Sfizi", "Black Cod (merluzzo carbonaro) in pastella, chips di patate con buccia, salsa tartara (maionese, cetriolini sott'aceto, capperi. Servito con salsa Worchestershire)", [1, 3, 4]),
+    CUC("Panella e tartare di carne", "Sfizi", "Farina di ceci, tartare di manzo, maionese di cappero, maionese di acciughe, tuorlo marinato, aneto e ravanello.", [3, 4]),
+    CUC("Scagghiozza", "Sfizi", "Polenta, salsa verde, acciughe del Cantabrico/Lingua di bovino", [4]),
+    CUC("Falafel", "Sfizi", "ceci, prezzemolo, cumino, coriandolo, za'atar. Servito con Tzatziki", []),
+    CUC("Mix", "Sfizi", "1 pz di: panella, scagghiozza e falafel.", []),
+    CUC("Frittata di Pasta alla Napoletana: Genovese", "Sfizi", "Spaghettone, cipolle, manzo, sedano, carote, besciamella, sale, pepe, farina e panko.", [1, 9]),
+    CUC("Frittata di Pasta alla Napoletana: Carbonara", "Sfizi", "Spaghettone, Salsa carbonara (tuorlo d'uovo, pecorino, parmigiano, pepe), besciamella, guanciale, farina e Panko", [1, 3, 7, 12]),
 
     // — Insalatine —
-    { name: "Oriental", section: "Insalatine", desc: "misticanza, salsa orientale, noci, feta veg, mela, pomodori confit", story: "", image: null, price: null, allergens: [6, 8] },
-    { name: "Caesar", section: "Insalatine", desc: "lattughino, salsa caesar, bacon, uova, petto di pollo, crostini (da confermare)", story: "", image: null, price: null, allergens: [1, 3, 4, 7] },
+    CUC("Oriental Crunch", "Insalatine", "misticanza, Dressing agli Agrumi (agrumi, soia, olio di semi, aglio e pepe), pomodori confit, Formaggio al Cocco, mela, noci", [6, 8]),
 
     // — Piatti —
-    { name: "Sashimi di tonno", section: "Piatti", desc: "tonno, cetriolo, menta, mela, salsa orientale", story: "", image: null, price: null, allergens: [4, 6] },
-    { name: "Caprese", section: "Piatti", desc: "pomodorini variegati, basilico variegato, bufala (250 g)", story: "", image: null, price: null, allergens: [7] },
-    { name: "Burratina", section: "Piatti", desc: "marmellata di pomodoro, crostoni (friselle alle olive)", story: "", image: null, price: null, allergens: [1, 7] },
-    { name: "Carpaccio di Black Angus", section: "Piatti", desc: "carpaccio di Black Angus, rucola, scaglie di parmigiano", story: "", image: null, price: null, allergens: [7] },
+    CUC("Carpaccio di tonno", "Piatti", "tonno, cetriolo, menta, mela, Dressing agli Agrumi (agrumi, soia, olio di semi, aglio e pepe)", [4, 6]),
+    CUC("Caprese", "Piatti", "Selezione di pomodorini, basilico, Mozzarella di bufala (250 g), olio e sale maldon", [7]),
+    CUC("Carpaccio di Black Angus", "Piatti", "carpaccio di Black Angus, rucola, scaglie di parmigiano", [7]),
 
     // — Signature —
-    { name: "Crispy tamago", section: "Signature", desc: "maionese di baccalà, gel umadashi (dashi, soia, kuzu), uovo poché panato nel panko e fritto, coste di bietola osmotizzate con soia, erba cipollina", story: "", image: null, price: null, allergens: [1, 3, 4, 6] }
+    CUC("Crispy tamago", "Signature", "maionese di baccalà, gel umadashi (Brodo verdure, salsa di soia), uovo poché panato nel panko e fritto, coste di bietola osmotizzate con soia affumicata al katsuobushi, erba cipollina, sale maldon", [1, 3, 4, 6, 9])
   ]
 };
 
