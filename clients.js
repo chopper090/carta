@@ -77,7 +77,8 @@ const CLIENTS = {
     presets: [
       { key: "barettoSignature", num: "01", name: "Signature",  tag: "cocktail" },
       { key: "barettoClassici",  num: "02", name: "I Classici", tag: "cocktail" },
-      { key: "barettoCucina",    num: "03", name: "Cucina",     tag: "food" }
+      { key: "barettoCucina",    num: "03", name: "Cucina",     tag: "food" },
+      { key: "barettoBeverage",  num: "04", name: "Beverage",   tag: "drink list" }
     ],
     defaultPreset: "barettoSignature"
   }
