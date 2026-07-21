@@ -4,12 +4,12 @@
 // ============================================================
 
 const VARIANTS = [
-  { id: "classico",       num: "I",   name: "Classico",       desc: "centrato, simmetrico",          tags: "essenziale · 2 pagine" },
-  { id: "contemporaneo",  num: "II",  name: "Contemporaneo",  desc: "editoriale, asimmetrico",       tags: "essenziale · 2 pagine" },
-  { id: "tabula",         num: "III", name: "Tabula",         desc: "ultra-minimale, una pagina",    tags: "essenziale · 1 pagina" },
-  { id: "editoriale",     num: "IV",  name: "Editoriale",     desc: "con foto e racconto",           tags: "racconto · multi-pagina" },
-  { id: "diario",         num: "V",   name: "Diario",         desc: "racconto, senza foto",          tags: "racconto · multi-pagina" },
-  { id: "listino",        num: "VI",  name: "Listino",        desc: "denso, multi-colonna",          tags: "bar · multi-pagina" }
+  { id: "classico",       num: "I",   name: "Classico",       desc: "centrato, simmetrico",          tags: "essenziale · colonne + pagine" },
+  { id: "contemporaneo",  num: "II",  name: "Contemporaneo",  desc: "editoriale, asimmetrico",       tags: "essenziale · colonne + pagine" },
+  { id: "tabula",         num: "III", name: "Tabula",         desc: "ultra-minimale",                tags: "essenziale · colonne + pagine" },
+  { id: "editoriale",     num: "IV",  name: "Editoriale",     desc: "con foto e racconto",           tags: "racconto · voci/pagina" },
+  { id: "diario",         num: "V",   name: "Diario",         desc: "racconto, senza foto",          tags: "racconto · voci/pagina" },
+  { id: "listino",        num: "VI",  name: "Listino",        desc: "denso, multi-colonna",          tags: "bar · colonne + pagine" }
 ];
 
 const NARRATIVE_VARIANTS = new Set(["editoriale", "diario"]);
@@ -26,6 +26,24 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
   const updateField = (field, value) => {
     setMenu(prev => ({ ...prev, [field]: value }));
   };
+
+  // ---- Impaginazione per-variante (colonne + voci per pagina) ----
+  const grid = (typeof gridOf === "function")
+    ? gridOf(menu, variant)
+    : { cols: 1, perPage: 0, maxCols: 1 };
+  const gridDef = ((typeof GRID_DEFAULTS !== "undefined" && GRID_DEFAULTS) || {})[variant] || { maxCols: 1, perPage: 0 };
+  // valore di partenza quando si passa da "Auto" a un numero fisso
+  const PP_START = { classico: 6, contemporaneo: 7, tabula: 8, editoriale: 2, diario: 3, listino: 12 };
+  const setGrid = (patch) => setMenu(prev => {
+    const g = { ...(prev.grid || {}) };
+    g[variant] = { ...(g[variant] || {}), ...patch };
+    return { ...prev, grid: g };
+  });
+  const stepPerPage = (delta) => {
+    if (grid.perPage === 0) { setGrid({ perPage: PP_START[variant] || 6 }); return; }
+    setGrid({ perPage: Math.max(1, grid.perPage + delta) });
+  };
+  const variantName = (VARIANTS.find(v => v.id === variant) || {}).name || "";
 
   const updateDish = (i, field, value) => {
     setMenu(prev => {
@@ -153,19 +171,45 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
         </div>
       </div>
 
-      {variant === "listino" && (
-        <div className="form-section">
-          <div className="section-label">Colonne · Listino</div>
-          <div className="cols-pick">
-            {[1, 2, 3].map(n => (
-              <button key={n} type="button"
-                className={"cols-btn " + (((menu.cols || 2) === n) ? "active" : "")}
-                onClick={() => updateField("cols", n)}>{n}<span>col</span></button>
-            ))}
+      <div className="form-section">
+        <div className="section-label">Impaginazione · {variantName}</div>
+
+        {gridDef.maxCols > 1 && (
+          <>
+            <div className="pp-sublabel">Colonne</div>
+            <div className="cols-pick">
+              {Array.from({ length: gridDef.maxCols }, (_, k) => k + 1).map(n => (
+                <button key={n} type="button"
+                  className={"cols-btn " + (grid.cols === n ? "active" : "")}
+                  onClick={() => setGrid({ cols: n })}>{n}<span>col</span></button>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className="pp-sublabel">Voci per pagina</div>
+        <div className="pp-pick">
+          <button type="button"
+            className={"pp-auto " + (grid.perPage === 0 ? "active" : "")}
+            onClick={() => setGrid({ perPage: 0 })}>Auto</button>
+          <div className="pp-step">
+            <button type="button" aria-label="Meno voci per pagina"
+              onClick={() => stepPerPage(-1)}
+              disabled={grid.perPage !== 0 && grid.perPage <= 1}>−</button>
+            <span className="pp-val">{grid.perPage === 0 ? "auto" : grid.perPage}</span>
+            <button type="button" aria-label="Più voci per pagina"
+              onClick={() => stepPerPage(+1)}>+</button>
           </div>
-          <p className="cols-hint">Più colonne = più compatto. Le pagine A4 si creano da sole: stampi quelle che ti servono.</p>
         </div>
-      )}
+
+        <p className="cols-hint">
+          {gridDef.maxCols > 1
+            ? "Più colonne = più compatto. "
+            : ""}
+          Con <strong>Auto</strong> le pagine A4 si creano da sole in base al contenuto — nessun limite.
+          Imposta un numero per fissare quante voci stanno in ogni pagina.
+        </p>
+      </div>
 
       <div className="form-section">
         <div className="section-label">Carica esempio</div>

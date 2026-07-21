@@ -19,6 +19,12 @@ stateful interdipendenti: Form + 5 "sheet"). Zero build. PWA (sw + manifest + `.
 **Dove stanno i dati.** `localStorage`, **per-cliente**: `menu.<id>`, `variant.<id>`,
 `active.client`, `ui.theme`. Migrazione legacy dalla vecchia chiave `dalentini.menu`.
 
+**Impaginazione.** `menu.grid[variante] = { cols, perPage }` (in `menu-data.js`;
+`perPage:0` = auto). Colonne + voci-per-pagina scelte per singolo stile dal form.
+Il motore (`menu-sheets.jsx`) impagina da sé senza limiti: helper `gridOf`,
+`paginateDishes`, `WEIGHTS`, `GRID_DEFAULTS` (esposti su `window`). Le colonne
+valgono solo sugli stili a lista (classico/contemporaneo/tabula/listino).
+
 **Come si edita.** Cliente nuovo → voce in `CLIENTS` + preset in `PRESET_MENUS` (+ eventuale
 blocco `[data-client]` nel CSS). Il motore (`menu-sheets/form`) non va toccato: legge tutto da
 `client`/`getClient`.

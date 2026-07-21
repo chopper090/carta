@@ -333,9 +333,10 @@ const EMPTY_MENU = {
   price: 0,
   chef: "",
   seats: 8,
-  cols: 2,
+  cols: 2,       // legacy — sostituito da grid[variante].cols (compat conservata)
   chefNote: "",
   layout: {},   // posizioni drag&drop per variante: { [variante]: { [id]: {x,y} } }
+  grid: {},     // impaginazione per variante: { [variante]: { cols, perPage } }  (perPage 0 = auto)
   dishes: [
     { name: "", section: "", desc: "", story: "", image: null, price: null, allergens: [] }
   ]
@@ -348,6 +349,7 @@ function normalizeMenu(m){
     ...EMPTY_MENU,
     ...m,
     layout: m.layout || {},
+    grid: m.grid || {},
     dishes: (m.dishes || []).map(d => ({
       name: d.name || "",
       section: d.section || "",
