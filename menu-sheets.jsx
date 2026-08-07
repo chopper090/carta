@@ -519,12 +519,22 @@ const SectionHead = ({ title, variant, divider, takeaway }) => (
   </div>
 );
 
-// Separatore a tutta pagina che apre una macroarea (con il suo nome).
+// Filetto ondulato — stessa onda del decoro costiero, disegnata come linea.
+const WaveRule = () => (
+  <svg className="area-band-wave" viewBox="0 0 240 12" preserveAspectRatio="none" aria-hidden="true">
+    <path
+      d="M0,6 C10,0 20,0 30,6 C40,12 50,12 60,6 C70,0 80,0 90,6 C100,12 110,12 120,6 C130,0 140,0 150,6 C160,12 170,12 180,6 C190,0 200,0 210,6 C220,12 230,12 240,6"
+      fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"
+      vectorEffect="non-scaling-stroke" />
+  </svg>
+);
+
+// Separatore ondulato a tutta pagina che apre una macroarea (col suo nome).
 const AreaBand = ({ name }) => (
   <div className="area-band">
-    <span className="area-band-rule" aria-hidden="true"></span>
+    <WaveRule />
     {name ? <span className="area-band-name">{name}</span> : null}
-    <span className="area-band-rule" aria-hidden="true"></span>
+    {name ? <WaveRule /> : null}
   </div>
 );
 
@@ -1167,8 +1177,6 @@ function MenuListino({ menu, client }) {
               {pages.length > 1 && <span className="lst-folio">{folio(pi + 1, pages.length)} / {folio(pages.length, pages.length)}</span>}
             </span>
           </div>
-
-          {pi === 0 && coast && <CoastWave className="lst-wave" />}
 
           {opensArea(menu.dishes, pg.start) && areaOf(menu.dishes[pg.start]) && <AreaBand name={areaOf(menu.dishes[pg.start])} />}
           <div className="lst-body" data-fitbox style={{ columnCount: colsAt(pg.start) }}>
