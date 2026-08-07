@@ -566,6 +566,7 @@ const EMPTY_MENU = {
   chefNote: "",
   layout: {},   // posizioni drag&drop per variante: { [variante]: { [id]: {x,y,s,h} } }
   sectionMeta: {},  // per nome sezione: { divider: separatore arancione prima, takeaway: sezione asporto }
+  areaMeta: {},     // per nome MACROAREA: { cols, perPage } — impaginazione indipendente
   grid: {},     // impaginazione per variante: { [variante]: { cols, perPage } }  (perPage 0 = auto)
   dishes: [
     { name: "", section: "", desc: "", story: "", image: null, price: null, allergens: [] }
@@ -581,8 +582,10 @@ function normalizeMenu(m){
     layout: m.layout || {},
     grid: m.grid || {},
     sectionMeta: m.sectionMeta || {},
+    areaMeta: m.areaMeta || {},
     dishes: (m.dishes || []).map(d => ({
       name: d.name || "",
+      area: d.area || "",
       section: d.section || "",
       desc: d.desc || "",
       story: d.story || "",

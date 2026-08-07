@@ -2374,6 +2374,30 @@ body{
 .lst-sec .ms-divider{ position: absolute; left: 0; right: 0; top: -7px; margin: 0; width: auto; }
 .lst-group:has(> .lst-sec > .ms-divider){ margin-top: 15px; }
 
+/* ---- MACROAREA: separatore arancione a tutta pagina + nome ---- */
+.area-band{
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  margin: 0 0 7mm; padding: 0;
+}
+.area-band-rule{
+  flex: 1 1 auto; height: 3px; border-radius: 2px; background: var(--sep-orange, #F2972E);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.area-band-name{
+  flex: 0 0 auto; font-family: var(--f-mono); font-size: 9pt;
+  letter-spacing: .22em; text-transform: uppercase; color: var(--sep-orange, #F2972E);
+  white-space: nowrap;
+}
+/* la banda è una riga in più nella griglia della pagina */
+.inner-page-c:has(> .area-band),
+.inner-page-m:has(> .area-band),
+.ed-page:has(> .area-band),
+.dr-page:has(> .area-band){ grid-template-rows: auto auto 1fr auto; }
+.tabula-page:has(> .area-band){ grid-template-rows: auto auto auto 1fr auto; }
+/* nel listino (colonna flex) si inserisce da sola */
+.lst-page .area-band{ margin-bottom: 5mm; }
+.sheet-listino .area-band-name{ font-size: 8.5pt; }
+
 /* Etichetta "asporto" accanto al nome della sezione */
 .ms-tag{
   font-family: var(--f-mono); font-style: normal; font-size: .52em;
@@ -2458,6 +2482,51 @@ body{
 .section-move-none{ font-style: italic; color: var(--warm-grey); text-transform: none; letter-spacing: 0; }
 .section-move-count{ color: var(--warm-grey); font-size: 9.5px; }
 .section-move-ctrls{ display: flex; gap: 4px; flex: 0 0 auto; }
+
+/* Editor · riga MACROAREA (livello sopra le sezioni) */
+.area-row{
+  margin: 20px 0 10px; padding: 9px 10px; border-radius: 9px;
+  background: color-mix(in srgb, var(--sep-orange, #F2972E) 14%, var(--cream-deep));
+  border: 1px solid color-mix(in srgb, var(--sep-orange, #F2972E) 55%, transparent);
+  border-left: 4px solid var(--sep-orange, #F2972E);
+}
+.area-row:first-child{ margin-top: 0; }
+.area-row-top{ display: flex; align-items: center; gap: 8px; }
+.area-row-badge{
+  flex: 0 0 auto; width: 20px; height: 20px; border-radius: 5px;
+  background: var(--sep-orange, #F2972E); color: #fff;
+  font-family: var(--f-mono); font-size: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.area-row-name{
+  flex: 1 1 auto; min-width: 0; background: transparent; border: 1px solid transparent;
+  border-radius: 5px; padding: 3px 6px; color: var(--ink);
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+}
+.area-row-name:hover{ border-color: var(--line-soft); }
+.area-row-name:focus{ border-color: var(--sep-orange, #F2972E); background: var(--cream); outline: none; }
+.area-row-grid{ display: flex; flex-wrap: wrap; gap: 12px; margin-top: 7px; }
+.area-mini{ display: flex; align-items: center; gap: 6px; }
+.area-mini em{
+  font-style: normal; font-family: var(--f-mono); font-size: 8.5px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--warm-grey);
+}
+.area-cols, .area-pp{ display: flex; align-items: center; gap: 3px; }
+.area-cols button, .area-pp button{
+  min-width: 21px; height: 20px; border: 1px solid var(--line-soft); background: var(--cream);
+  color: var(--ink); border-radius: 4px; cursor: pointer; font-family: var(--f-mono); font-size: 10px;
+}
+.area-cols button:hover, .area-pp button:hover{ border-color: var(--sep-orange, #F2972E); }
+.area-cols button.on{ background: var(--sep-orange, #F2972E); color: #fff; border-color: var(--sep-orange, #F2972E); }
+.area-pp b{ font-family: var(--f-mono); font-size: 10.5px; font-weight: 400; min-width: 30px; text-align: center; color: var(--ink); }
+
+/* selettore macroarea sulla riga di sezione */
+.sec-area-pick{ display: flex; align-items: center; gap: 6px; margin: 0 0 8px 10px; }
+.sec-area-pick span{
+  font-family: var(--f-mono); font-size: 8.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--warm-grey);
+}
+.sec-area-pick select{ flex: 1 1 auto; font-size: 11px; padding: 4px 6px; }
 
 /* Editor · riga di sezione: nome modificabile, separatore, asporto */
 .section-move-row{ position: relative; flex-wrap: wrap; }
