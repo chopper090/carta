@@ -4,7 +4,7 @@
 // Client-aware: brand, logo, palette e font dipendono dal cliente.
 // ============================================================
 
-const { useState, useEffect, useRef, useMemo, useContext } = React;
+const { useRef, useContext, useState, useLayoutEffect } = React;
 
 // ============================================================
 // Drag & drop della copertina — riposizionamento libero con
@@ -187,6 +187,22 @@ function _packPages(list, cols, perPage, weight){
   return pages;
 }
 
+// Se la pagina inizia in mezzo a una sezione, restituisce il nome della sezione
+// (serve a ristampare l'intestazione come "Amari (segue)") — altrimenti null.
+const contSectionOf = (dishes, start) => {
+  if (!start) return null;
+  const s = dishes[start] && dishes[start].section;
+  return (s && dishes[start - 1] && dishes[start - 1].section === s) ? s : null;
+};
+
+// Numerazione pagine: romana finché è leggibile, araba da 10 pagine in su
+// (con 54 pagine "XLII / LIV" è illeggibile).
+const folio = (n, total) => (total > 10 ? String(n) : romanize(n));
+
+// Liste con prezzo per voce (bar/listino): "coperti" e "portate" non hanno senso.
+const isPriceList = (menu) =>
+  (menu && menu.dishes || []).some(d => d.price !== null && d.price !== undefined);
+
 // Raggruppa i piatti per sezione consecutiva → [{ sec, start, items }].
 function sectionGroups(list){
   const groups = [];
@@ -357,7 +373,8 @@ function MenuClassico({ menu, client }) {
             {menu.category && <span className="cover-cat-c">menu {menu.category}</span>}
           </div>
           <Draggable id="stats" offset={L.stats}><div className="cover-portate-c">
-            {courseNumber(portate-1)} portate <span className="dot-sep">·</span> {formatPrice(menu.price)}
+            {portate} {isPriceList(menu) ? "voci" : "portate"}
+            {menu.price ? <><span className="dot-sep">·</span> {formatPrice(menu.price)}</> : null}
           </div></Draggable>
           {menu.chefNote && (
             <p className="cover-note-c">{menu.chefNote}</p>
@@ -377,11 +394,13 @@ function MenuClassico({ menu, client }) {
             <div className="inner-wm-c"><Brand client={C} className="brand-sm" /></div>
             <div className="inner-menu-name-c">
               — {menu.name} —
-              {pages.length > 1 && <span className="inner-folio-c"> · {romanize(pi + 1)}/{romanize(pages.length)}</span>}
+              {pages.length > 1 && <span className="inner-folio-c"> · {folio(pi + 1, pages.length)}/{folio(pages.length, pages.length)}</span>}
             </div>
           </div>
 
           <div className="dishes-c" style={colStyle(cols)}>
+            {contSectionOf(menu.dishes, pg.start) &&
+              <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="c" />}
             {pg.items.map((d, idx) => {
               const i = pg.start + idx;
               return (
@@ -453,17 +472,21 @@ function MenuContemporaneo({ menu, client }) {
           <div className="cover-rule-m"></div>
           <Draggable id="stats" offset={L.stats}><div className="cover-stats-m">
             <div className="stat-m">
-              <span className="stat-label-m">Portate</span>
-              <span className="stat-val-m">{courseNumber(portate - 1)}</span>
+              <span className="stat-label-m">{isPriceList(menu) ? "Voci" : "Portate"}</span>
+              <span className="stat-val-m">{portate}</span>
             </div>
-            <div className="stat-m">
-              <span className="stat-label-m">Prezzo</span>
-              <span className="stat-val-m">{formatPrice(menu.price)}</span>
-            </div>
-            <div className="stat-m">
-              <span className="stat-label-m">Coperti</span>
-              <span className="stat-val-m">{String(menu.seats).padStart(2,"0")}</span>
-            </div>
+            {menu.price ? (
+              <div className="stat-m">
+                <span className="stat-label-m">Prezzo</span>
+                <span className="stat-val-m">{formatPrice(menu.price)}</span>
+              </div>
+            ) : null}
+            {!isPriceList(menu) && (
+              <div className="stat-m">
+                <span className="stat-label-m">Coperti</span>
+                <span className="stat-val-m">{String(menu.seats).padStart(2,"0")}</span>
+              </div>
+            )}
           </div></Draggable>
           {menu.chefNote && (
             <p className="cover-note-m">«&nbsp;{menu.chefNote}&nbsp;»</p>
@@ -481,10 +504,12 @@ function MenuContemporaneo({ menu, client }) {
         <div className="page-A4 inner-page-m" key={pi}>
           <div className="inner-top-m">
             <span className="inner-wm-m"><Brand client={C} className="brand-sm" /></span>
-            <span className="inner-name-m">{menu.name} · {courseNumber(portate-1)} portate</span>
+            <span className="inner-name-m">{menu.name} · {portate} {isPriceList(menu) ? "voci" : "portate"}</span>
           </div>
 
           <div className="dishes-m" style={colStyle(cols)}>
+            {contSectionOf(menu.dishes, pg.start) &&
+              <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="m" />}
             {pg.items.map((d, idx) => {
               const i = pg.start + idx;
               return (
@@ -512,7 +537,7 @@ function MenuContemporaneo({ menu, client }) {
             <div className="legend-m">
               {pi === pages.length - 1 && <AllergensLegend />}
             </div>
-            <div className="folio-m">{romanize(pi + 2)}</div>
+            <div className="folio-m">{folio(pi + 2, pages.length + 1)}</div>
           </div>
         </div>
       ))}
@@ -547,21 +572,21 @@ function MenuTabula({ menu, client }) {
               <div className="tab-rule"></div>
               {coast && <CoastWave className="tab-wave" />}
               <div className="tab-stats">
-                <span>{courseNumber(portate-1)} portate</span>
-                <span className="dot-sep">·</span>
-                <span>{formatPrice(menu.price)}</span>
-                <span className="dot-sep">·</span>
-                <span>{menu.seats} posti</span>
+                <span>{portate} {isPriceList(menu) ? "voci" : "portate"}</span>
+                {menu.price ? <><span className="dot-sep">·</span><span>{formatPrice(menu.price)}</span></> : null}
+                {!isPriceList(menu) && <><span className="dot-sep">·</span><span>{menu.seats} posti</span></>}
               </div>
             </div>
           ) : (
             <div className="tab-title-cont">
               <span className="tab-name-cont">{menu.name || "—"}</span>
-              <span className="tab-folio-cont">{romanize(pi + 1)} / {romanize(pages.length)}</span>
+              <span className="tab-folio-cont">{folio(pi + 1, pages.length)} / {folio(pages.length, pages.length)}</span>
             </div>
           )}
 
           <div className="tab-dishes" style={colStyle(cols)}>
+            {contSectionOf(menu.dishes, pg.start) &&
+              <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="t" />}
             {pg.items.map((d, idx) => {
               const i = pg.start + idx;
               return (
@@ -623,9 +648,8 @@ function MenuEditoriale({ menu, client }) {
             <div className="ed-cat">— menu {menu.category} —</div>
             <h1 className="ed-name">{menu.name || "—"}</h1>
             <div className="ed-cover-stats">
-              <span>{courseNumber(portate-1)} portate</span>
-              <span className="dot-sep">·</span>
-              <span>{formatPrice(menu.price)}</span>
+              <span>{portate} {isPriceList(menu) ? "voci" : "portate"}</span>
+              {menu.price ? <><span className="dot-sep">·</span><span>{formatPrice(menu.price)}</span></> : null}
             </div>
             {menu.chefNote && <p className="ed-cover-note">«&nbsp;{menu.chefNote}&nbsp;»</p>}
           </div>
@@ -641,8 +665,8 @@ function MenuEditoriale({ menu, client }) {
         <div className="page-A4 ed-page" key={pIdx}>
           <div className="ed-page-head">
             <span className="ed-page-wm"><Brand client={C} className="brand-sm" /></span>
-            <span className="ed-page-name">{menu.name} · {courseNumber(portate-1)} portate</span>
-            <span className="ed-page-folio">{romanize(pIdx + 2)}</span>
+            <span className="ed-page-name">{menu.name} · {portate} {isPriceList(menu) ? "voci" : "portate"}</span>
+            <span className="ed-page-folio">{folio(pIdx + 2, pages.length + 1)}</span>
           </div>
 
           <div className="ed-page-body">
@@ -724,9 +748,9 @@ function MenuDiario({ menu, client }) {
           )}
           <div className="dr-rule"></div>
           <div className="dr-cover-stats">
-            <div className="dr-stat"><span className="dr-stat-lbl">portate</span><span className="dr-stat-val">{courseNumber(portate-1)}</span></div>
+            <div className="dr-stat"><span className="dr-stat-lbl">{isPriceList(menu) ? "voci" : "portate"}</span><span className="dr-stat-val">{portate}</span></div>
             <div className="dr-stat"><span className="dr-stat-lbl">prezzo</span><span className="dr-stat-val">{formatPrice(menu.price)}</span></div>
-            <div className="dr-stat"><span className="dr-stat-lbl">coperti</span><span className="dr-stat-val">{String(menu.seats).padStart(2,"0")}</span></div>
+            {!isPriceList(menu) && <div className="dr-stat"><span className="dr-stat-lbl">coperti</span><span className="dr-stat-val">{String(menu.seats).padStart(2,"0")}</span></div>}
           </div>
         </div>
 
@@ -740,11 +764,13 @@ function MenuDiario({ menu, client }) {
         <div className="page-A4 dr-page" key={pIdx}>
           <div className="dr-page-head">
             <span className="dr-page-wm"><Brand client={C} className="brand-sm" /></span>
-            <span className="dr-page-meta">{menu.name} · {courseNumber(portate-1)} portate</span>
-            <span className="dr-page-folio">{romanize(pIdx + 2)}</span>
+            <span className="dr-page-meta">{menu.name} · {portate} {isPriceList(menu) ? "voci" : "portate"}</span>
+            <span className="dr-page-folio">{folio(pIdx + 2, pages.length + 1)}</span>
           </div>
 
           <div className="dr-entries">
+            {contSectionOf(menu.dishes, group.start) &&
+              <SectionHead title={contSectionOf(menu.dishes, group.start) + " (segue)"} variant="dr" />}
             {group.items.map((d, idx) => {
               const i = group.start + idx;
               return (
@@ -807,7 +833,7 @@ function MenuListino({ menu, client }) {
     groups.forEach(g => {
       if (perPage > 0 && g.items.length > perPage){
         for (let i = 0; i < g.items.length; i += perPage)
-          pages.push([{ section: g.section, items: g.items.slice(i, i + perPage) }]);
+          pages.push([{ section: g.section, items: g.items.slice(i, i + perPage), cont: i > 0 }]);
       } else {
         pages.push([g]);
       }
@@ -833,7 +859,7 @@ function MenuListino({ menu, client }) {
             <span className="lst-wm"><Brand client={C} className="brand-sm" /></span>
             <span className="lst-meta">
               <span className="lst-title">{menu.name || "—"}</span>
-              {pages.length > 1 && <span className="lst-folio">{romanize(pi + 1)} / {romanize(pages.length)}</span>}
+              {pages.length > 1 && <span className="lst-folio">{folio(pi + 1, pages.length)} / {folio(pages.length, pages.length)}</span>}
             </span>
           </div>
 
@@ -842,7 +868,7 @@ function MenuListino({ menu, client }) {
           <div className="lst-body" style={{ columnCount: cols }}>
             {pageGroups.map((g, gi) => (
               <section className="lst-group" key={gi}>
-                {g.section && <div className="lst-sec">{g.section}</div>}
+                {g.section && <div className="lst-sec">{g.section}{g.cont ? " (segue)" : ""}</div>}
                 {g.items.map((d, di) => (
                   <div className="lst-item" key={di}>
                     <div className="lst-item-head">

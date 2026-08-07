@@ -140,8 +140,17 @@ function App(){
   }, [clientId]);
 
   // ---- persistence (per cliente) ----
+  // Salvataggio ritardato: con liste lunghe scrivere a ogni tasto blocca la
+  // digitazione. Se lo spazio finisce (foto pesanti) lo diciamo, non in silenzio.
+  const [saveErr, setSaveErr] = useState(false);
   useEffect(() => {
-    try{ localStorage.setItem("menu." + clientId, JSON.stringify(menu)); } catch(e){}
+    const t = setTimeout(() => {
+      try{
+        localStorage.setItem("menu." + clientId, JSON.stringify(menu));
+        setSaveErr(false);
+      } catch(e){ setSaveErr(true); }
+    }, 400);
+    return () => clearTimeout(t);
   }, [menu, clientId]);
   useEffect(() => {
     try{ localStorage.setItem("variant." + clientId, variant); } catch(e){}
@@ -244,13 +253,13 @@ function App(){
       setMenu(JSON.parse(JSON.stringify(EMPTY_MENU)));
     }
   };
-  const exportMenu = (kind) => {
+  const exportMenu = async (kind) => {
     const prefix = client.id;
     if (kind === "json"){
       const blob = new Blob([JSON.stringify(menu, null, 2)], { type: "application/json" });
       downloadBlob(blob, `${prefix}-${slug(menu.name)}.json`);
     } else if (kind === "html"){
-      const html = buildStandaloneHTML(menu, variant, clientId);
+      const html = await buildStandaloneHTML(menu, variant, clientId, previewRef.current);
       const blob = new Blob([html], { type: "text/html" });
       downloadBlob(blob, `${prefix}-${slug(menu.name)}.html`);
     }
@@ -306,6 +315,11 @@ function App(){
 
           <div className="ptb-spacer"></div>
 
+          {saveErr && (
+            <span className="ptb-warn" title="Spazio del browser esaurito: il menù non viene più salvato. Alleggerisci le foto o esporta in JSON.">
+              ⚠ non salvato
+            </span>
+          )}
           {hasLayout && (
             <button className="ptb-theme" onClick={resetLayout}
               title="Reimposta le posizioni della copertina" aria-label="Reimposta posizioni copertina">⤺</button>
@@ -359,31 +373,50 @@ function slug(s){
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 }
-function buildStandaloneHTML(menu, variant, clientId){
+// Export HTML VERAMENTE standalone: incorpora il CSS e le pagine già
+// renderizzate (niente React/Babel, niente file affiancati). Il file si apre
+// ovunque — anche offline, anche mandato per email alla stamperia.
+async function buildStandaloneHTML(menu, variant, clientId, pane){
   const cl = getClient(clientId);
   const clientFonts = cl.fonts ? `\n<link href="${cl.fonts}" rel="stylesheet">` : "";
+
+  let css = "";
+  try { css = await (await fetch("menu-generator.css", { cache: "reload" })).text(); } catch(e){}
+
+  let body = "";
+  const sheet = pane && pane.querySelector(".sheet");
+  if (sheet){
+    const clone = sheet.cloneNode(true);
+    // ripulisce gli agganci dell'editor (drag, tooltip, pagina corrente)
+    clone.querySelectorAll(".draggable").forEach(el => {
+      el.classList.remove("editable", "dragging");
+      el.removeAttribute("title");
+    });
+    clone.querySelectorAll("[data-current]").forEach(el => el.removeAttribute("data-current"));
+    body = clone.outerHTML;
+  }
+
   return `<!DOCTYPE html>
 <html lang="it" data-theme="light"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${menu.name} · ${cl.name}</title>
 <meta name="color-scheme" content="light"><meta name="darkreader-lock">
 <link href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Poppins:ital,wght@0,300;0,400;1,300;1,400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">${clientFonts}
-<link rel="stylesheet" href="menu-generator.css">
-<style>body{background:white;overflow:visible;height:auto}#root{display:block;height:auto}.sheet{transform:none}.page-A4{margin:0 auto 24px;box-shadow:0 8px 24px rgba(0,0,0,.12)}@media print{.page-A4{box-shadow:none;page-break-after:always;page-break-inside:avoid}.page-A4:last-child{page-break-after:avoid}}</style>
+<style>
+${css}
+/* --- adattamenti per il file esportato --- */
+html,body{background:#fff;height:auto;overflow:auto;margin:0}
+.app{display:block;width:auto;height:auto}
+.sheet{transform:none!important;gap:24px;padding:24px 0}
+.page-A4{margin:0 auto;box-shadow:0 8px 24px rgba(0,0,0,.12)}
+@media print{
+  .sheet{gap:0;padding:0}
+  .page-A4{box-shadow:none;border:none;margin:0 auto;break-after:page;page-break-after:always;break-inside:avoid;page-break-inside:avoid}
+  .page-A4:last-child{break-after:avoid;page-break-after:avoid}
+}
+</style>
 </head><body>
-<div id="root"></div>
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"><\/script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"><\/script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"><\/script>
-<script src="clients.js"><\/script>
-<script src="menu-data.js"><\/script>
-<script type="text/babel" src="menu-sheets.jsx"><\/script>
-<script type="text/babel">
-const MENU = ${JSON.stringify(menu, null, 2)};
-const CLIENT = getClient(${JSON.stringify(clientId)});
-const SheetMap = { classico: MenuClassico, contemporaneo: MenuContemporaneo, tabula: MenuTabula, editoriale: MenuEditoriale, diario: MenuDiario, listino: MenuListino };
-const Sheet = SheetMap[${JSON.stringify(variant)}] || MenuContemporaneo;
-ReactDOM.createRoot(document.getElementById("root")).render(<Sheet menu={MENU} client={CLIENT} />);
-<\/script>
+<div class="app" data-client="${clientId}" data-print-scope="all">${body}</div>
 </body></html>`;
 }
 

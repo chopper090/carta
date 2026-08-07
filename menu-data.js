@@ -563,7 +563,6 @@ const EMPTY_MENU = {
   price: 0,
   chef: "",
   seats: 8,
-  cols: 2,       // legacy — sostituito da grid[variante].cols (compat conservata)
   chefNote: "",
   layout: {},   // posizioni drag&drop per variante: { [variante]: { [id]: {x,y} } }
   grid: {},     // impaginazione per variante: { [variante]: { cols, perPage } }  (perPage 0 = auto)
