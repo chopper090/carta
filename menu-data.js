@@ -564,7 +564,8 @@ const EMPTY_MENU = {
   chef: "",
   seats: 8,
   chefNote: "",
-  layout: {},   // posizioni drag&drop per variante: { [variante]: { [id]: {x,y} } }
+  layout: {},   // posizioni drag&drop per variante: { [variante]: { [id]: {x,y,s,h} } }
+  sectionMeta: {},  // per nome sezione: { divider: separatore arancione prima, takeaway: sezione asporto }
   grid: {},     // impaginazione per variante: { [variante]: { cols, perPage } }  (perPage 0 = auto)
   dishes: [
     { name: "", section: "", desc: "", story: "", image: null, price: null, allergens: [] }
@@ -579,6 +580,7 @@ function normalizeMenu(m){
     ...m,
     layout: m.layout || {},
     grid: m.grid || {},
+    sectionMeta: m.sectionMeta || {},
     dishes: (m.dishes || []).map(d => ({
       name: d.name || "",
       section: d.section || "",
@@ -586,6 +588,7 @@ function normalizeMenu(m){
       story: d.story || "",
       image: d.image || null,
       price: (d.price === 0 || d.price) ? d.price : null,
+      takeaway: !!d.takeaway,
       allergens: d.allergens || []
     }))
   };

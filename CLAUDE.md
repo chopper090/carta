@@ -32,6 +32,12 @@ ingrandisce e nasconde qualunque blocco (`FREE_BLOCKS`, `tagFreeBlocks`,
 `applyFreeLayout`, `installFreeDrag`). Stili inline → valgono anche in
 stampa/PDF/export. Si attiva col tasto ✥ nella barra dell'anteprima.
 
+**Sezioni.** `menu.sectionMeta[nome] = { divider, takeaway }` — separatore arancione
+prima della sezione e marchio "asporto". Sul piatto: `takeaway: true` mostra
+l'etichetta arancione. Dal form si rinomina la sezione (propaga a tutte le sue
+voci), si sposta in blocco, si aggiunge una voce dentro la sezione, si duplica
+una voce e si sposta tra sezioni con la tendina.
+
 **Export HTML.** È davvero standalone: CSS incorporato + pagine già renderizzate
 (nessun React/Babel, nessun file affiancato).
 

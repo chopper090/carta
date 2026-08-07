@@ -2246,7 +2246,7 @@ body{
    si adatta al tema di ogni cliente (oro DaLentini, blu baretto…).
    ============================================================ */
 .menu-section{
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
   margin: 22px 0 12px;
   break-inside: avoid; page-break-inside: avoid;
 }
@@ -2353,6 +2353,51 @@ body{
   letter-spacing: .04em;
 }
 
+/* ============================================================
+   Separatore di sezione (arancione) + voci/sezioni "asporto"
+   ============================================================ */
+:root{ --sep-orange: #F2972E; }
+
+/* Banda arancione che apre una sezione */
+.ms-divider{
+  flex: 0 0 100%; display: block; width: 100%; height: 2.5px; border-radius: 2px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--sep-orange) 25%, transparent),
+    var(--sep-orange) 18%, var(--sep-orange) 82%,
+    color-mix(in srgb, var(--sep-orange) 25%, transparent));
+  margin: 0 0 6mm;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.menu-section .ms-divider{ margin-bottom: 2mm; }
+/* nel Listino la banda sta SOPRA la fascia del titolo, non dentro */
+.lst-sec{ position: relative; }
+.lst-sec .ms-divider{ position: absolute; left: 0; right: 0; top: -7px; margin: 0; width: auto; }
+.lst-group:has(> .lst-sec > .ms-divider){ margin-top: 15px; }
+
+/* Etichetta "asporto" accanto al nome della sezione */
+.ms-tag{
+  font-family: var(--f-mono); font-style: normal; font-size: .52em;
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--sep-orange); border: 1px solid var(--sep-orange);
+  border-radius: 3px; padding: 1px 4px; margin-left: 8px; vertical-align: middle;
+  white-space: nowrap;
+}
+.lst-sec .ms-tag{ color: #fff; border-color: rgba(255,255,255,.85); }
+.sheet-listino .lst-sec-takeaway{
+  background: var(--sep-orange);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+
+/* Etichetta "asporto" sulla singola voce */
+.dish-takeaway{
+  display: inline-block; font-family: var(--f-mono); font-size: 6.5pt;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--sep-orange);
+  border: .6pt solid var(--sep-orange); border-radius: 3px;
+  padding: 0 3px; margin-left: 6px; vertical-align: middle; white-space: nowrap;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.lst-item .dish-takeaway{ font-size: 5.6pt; margin-left: 4px; }
+
 /* Anteprima · MODALITÀ LIBERA (sposta/ingrandisci/nascondi i blocchi) */
 .preview-pane.free-mode [data-free-id]{ cursor: move; }
 .preview-pane.free-mode [data-free-id]:hover{
@@ -2413,6 +2458,48 @@ body{
 .section-move-none{ font-style: italic; color: var(--warm-grey); text-transform: none; letter-spacing: 0; }
 .section-move-count{ color: var(--warm-grey); font-size: 9.5px; }
 .section-move-ctrls{ display: flex; gap: 4px; flex: 0 0 auto; }
+
+/* Editor · riga di sezione: nome modificabile, separatore, asporto */
+.section-move-row{ position: relative; flex-wrap: wrap; }
+.sec-divider-mark{
+  position: absolute; left: 0; right: 0; top: -8px; height: 3px; border-radius: 2px;
+  background: var(--sep-orange, #F2972E);
+}
+.section-move-row.sec-takeaway{
+  border-color: color-mix(in srgb, var(--sep-orange, #F2972E) 60%, transparent);
+  background: color-mix(in srgb, var(--sep-orange, #F2972E) 12%, var(--cream-deep));
+}
+.section-name-wrap{ display: flex; align-items: center; gap: 6px; flex: 1 1 120px; min-width: 0; }
+.section-name-input{
+  flex: 1 1 auto; min-width: 0; background: transparent; border: 1px solid transparent;
+  border-radius: 5px; padding: 3px 6px; color: var(--ink);
+  font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+}
+.section-name-input:hover{ border-color: var(--line-soft); }
+.section-name-input:focus{ border-color: var(--gold); background: var(--cream); outline: none; }
+.ctrl-btn.ctrl-sep.on{ background: var(--sep-orange, #F2972E); color: #fff; border-color: var(--sep-orange, #F2972E); }
+.ctrl-btn.ctrl-take.on{ background: var(--sep-orange, #F2972E); color: #fff; border-color: var(--sep-orange, #F2972E); }
+.ctrl-btn.ctrl-add{ color: var(--gold); font-weight: 600; }
+.mini-btn-row{ display: flex; gap: 6px; }
+
+/* Editor · tendina sezione + interruttore asporto nella scheda voce */
+.section-select{ width: 100%; }
+.takeaway-toggle{
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 8px 10px; border: 1px solid var(--line-soft); background: var(--cream-deep);
+  color: var(--warm-grey); border-radius: 8px; cursor: pointer;
+  font-family: var(--f-body); font-size: 12px; transition: all .15s;
+}
+.takeaway-toggle:hover{ border-color: var(--sep-orange, #F2972E); color: var(--ink); }
+.takeaway-toggle.on{
+  border-color: var(--sep-orange, #F2972E); color: var(--ink);
+  background: color-mix(in srgb, var(--sep-orange, #F2972E) 12%, var(--cream-deep));
+}
+.tt-check{
+  width: 17px; height: 17px; flex: 0 0 auto; border-radius: 5px; border: 1px solid var(--line-soft);
+  display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff;
+}
+.takeaway-toggle.on .tt-check{ background: var(--sep-orange, #F2972E); border-color: var(--sep-orange, #F2972E); }
 
 /* ============================================================
    Impaginazione multi-colonna / multi-pagina (stili a lista)
