@@ -233,6 +233,107 @@ function paginateDishes(dishes, cols, perPage, weight, sectionBreak){
   return pages.length ? pages : [{ start: 0, items: [] }];
 }
 
+// ============================================================
+// Impaginazione a MISURAZIONE REALE (solo in modalità Auto).
+// I pesi stimati sono solo il punto di partenza: qui misuriamo l'altezza
+// vera delle pagine renderizzate e spostiamo le voci finché ogni foglio è
+// pieno quanto può senza sbordare. Funziona anche con più colonne
+// (l'eccesso crea una colonna in più → lo vediamo da scrollWidth).
+// Le pagine sono rappresentate come indici di inizio: starts[i] = prima voce
+// della pagina i. Nessun limite al numero di pagine.
+// ============================================================
+// Firma degli input: se cambia, l'adattamento riparte da zero.
+const fitSig = (clientId, variant, cols, perPage, sectionBreak, dishes) =>
+  [clientId, variant, cols, perPage, sectionBreak ? 1 : 0, (dishes || []).length,
+   (dishes || []).map(d => (d.name || "").length + "." + (d.desc || "").length + "." +
+     (d.story || "").length + "." + (d.section || "")).join("|")].join("~");
+
+function useFittedPages(basePages, dishes, sectionBreak, enabled, sig, cols){
+  const rootRef = useRef(null);
+  const [starts, setStarts] = useState(() => basePages.map(p => p.start));
+  const phase = useRef(0);               // 0 = da misurare, 1+ = verifiche
+  const lastSig = useRef(sig);
+
+  if (lastSig.current !== sig){          // input cambiati → riparti pulito
+    lastSig.current = sig;
+    phase.current = 0;
+  }
+  useLayoutEffect(() => { phase.current = 0; setStarts(basePages.map(p => p.start)); }, [sig]);
+
+  useLayoutEffect(() => {
+    if (!enabled) return;
+    const root = rootRef.current;
+    if (!root) return;
+    const boxes = [...root.querySelectorAll("[data-fitbox]")];
+    const N = dishes.length;
+    if (!N || !boxes.length) return;
+
+    const secOf = (i) => (dishes[i] && dishes[i].section) || "";
+    const breaksAt = (i) => sectionBreak && i > 0 && secOf(i) !== secOf(i - 1);
+
+    // ---- FASE 0: misura una volta l'altezza vera di ogni voce e calcola
+    // l'impaginazione in un colpo solo (niente decine di ri-render).
+    if (phase.current === 0){
+      const cost = new Array(N).fill(0);
+      let seen = 0;
+      boxes.forEach(box => {
+        const gap = parseFloat(getComputedStyle(box).rowGap) || 0;
+        let pending = 0;                 // intestazioni di sezione: costo della voce che segue
+        box.querySelectorAll("[data-di],[data-fithead]").forEach(ch => {
+          const cs = getComputedStyle(ch);
+          const h = ch.getBoundingClientRect().height + gap +
+                    (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+          const a = ch.getAttribute("data-di");
+          if (a === null) pending += h;
+          else { cost[+a] = h + pending; pending = 0; seen++; }
+        });
+      });
+      if (seen < N) return;              // misura incompleta: riprova al prossimo giro
+
+      const A0 = boxes[0].clientHeight;                          // prima pagina
+      const A1 = boxes.length > 1 ? boxes[1].clientHeight : A0;  // pagine successive
+      const next = [0];
+      let acc = 0;
+      for (let i = 0; i < N; i++){
+        const avail = (next.length === 1 ? A0 : A1) * Math.max(1, cols || 1);
+        if (i > 0 && i !== next[next.length - 1] &&
+            (breaksAt(i) || acc + cost[i] > avail)){
+          next.push(i); acc = 0;
+        }
+        acc += cost[i];
+      }
+      phase.current = 1;
+      if (next.length !== starts.length || next.some((v, k) => v !== starts[k])) setStarts(next);
+      return;
+    }
+
+    // ---- FASE 1+: rete di sicurezza. Se per arrotondamenti una pagina
+    // sborda ancora (es. l'ultima con la legenda), sposta avanti l'eccesso.
+    if (phase.current > 8 || boxes.length !== starts.length) return;
+    const over = (b) => (b.scrollHeight > b.clientHeight + 1) || (b.scrollWidth > b.clientWidth + 1);
+    const endOf = (arr, i) => (i + 1 < arr.length ? arr[i + 1] : N);
+    const next = starts.slice();
+    let changed = false;
+    for (let i = 0; i < boxes.length; i++){
+      const from = next[i], to = endOf(next, i);
+      if (to - from > 1 && over(boxes[i])){
+        const moved = to - 1;
+        if (i + 1 < next.length && (!sectionBreak || secOf(moved) === secOf(next[i + 1]))) next[i + 1] = moved;
+        else next.splice(i + 1, 0, moved);
+        changed = true;
+        break;
+      }
+    }
+    if (changed){ phase.current += 1; setStarts(next); }
+  });
+
+  const pages = starts.map((s, i) => ({
+    start: s,
+    items: dishes.slice(s, i + 1 < starts.length ? starts[i + 1] : dishes.length)
+  }));
+  return [enabled ? pages : basePages, rootRef];
+}
+
 // ---- Utility ----
 const formatDate = (iso) => {
   if (!iso) return "";
@@ -257,7 +358,7 @@ const startsSection = (dishes, i) => {
 };
 // Intestazione di sezione (Antipasti, Buns, …) — stile per-variante via classe ms-<variante>
 const SectionHead = ({ title, variant }) => (
-  <div className={"menu-section ms-" + variant}>
+  <div className={"menu-section ms-" + variant} data-fithead>
     <span className="ms-rule" aria-hidden="true"></span>
     <span className="ms-label">{title}</span>
     <span className="ms-rule" aria-hidden="true"></span>
@@ -353,9 +454,11 @@ function MenuClassico({ menu, client }) {
   const portate = menu.dishes.length;
   const L = layoutOf(menu, "classico");
   const { cols, perPage, sectionBreak } = gridOf(menu, "classico");
-  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.classico, sectionBreak);
+  const base = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.classico, sectionBreak);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
+    fitSig(C.id, "classico", cols, perPage, sectionBreak, menu.dishes), cols);
   return (
-    <div className="sheet sheet-classico" data-client={C.id} data-screen-label="Menu Classico">
+    <div className="sheet sheet-classico" data-client={C.id} data-screen-label="Menu Classico" ref={fitRef}>
       <div className="page-A4 cover-page-c">
         {coast && <Citrus className="cover-citrus" />}
         <div className="cover-chef-c">{C.role} · {menu.chef}</div>
@@ -398,7 +501,7 @@ function MenuClassico({ menu, client }) {
             </div>
           </div>
 
-          <div className="dishes-c" style={colStyle(cols)}>
+          <div className="dishes-c" data-fitbox style={colStyle(cols)}>
             {contSectionOf(menu.dishes, pg.start) &&
               <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="c" />}
             {pg.items.map((d, idx) => {
@@ -406,7 +509,7 @@ function MenuClassico({ menu, client }) {
               return (
                 <React.Fragment key={i}>
                   {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="c" />}
-                  <div className="dish-c">
+                  <div className="dish-c" data-di={i}>
                     <div className="dish-num-c">{courseNumber(i)}</div>
                     <h3 className="dish-name-c">
                       {d.name || <span className="placeholder-c">Nome del piatto</span>}
@@ -455,9 +558,11 @@ function MenuContemporaneo({ menu, client }) {
   const portate = menu.dishes.length;
   const L = layoutOf(menu, "contemporaneo");
   const { cols, perPage, sectionBreak } = gridOf(menu, "contemporaneo");
-  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.contemporaneo, sectionBreak);
+  const base = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.contemporaneo, sectionBreak);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
+    fitSig(C.id, "contemporaneo", cols, perPage, sectionBreak, menu.dishes), cols);
   return (
-    <div className="sheet sheet-contemporaneo" data-client={C.id} data-screen-label="Menu Contemporaneo">
+    <div className="sheet sheet-contemporaneo" data-client={C.id} data-screen-label="Menu Contemporaneo" ref={fitRef}>
       <div className="page-A4 cover-page-m">
         {coast && <Citrus className="cover-citrus" />}
         <div className="cover-top-m">
@@ -507,7 +612,7 @@ function MenuContemporaneo({ menu, client }) {
             <span className="inner-name-m">{menu.name} · {portate} {isPriceList(menu) ? "voci" : "portate"}</span>
           </div>
 
-          <div className="dishes-m" style={colStyle(cols)}>
+          <div className="dishes-m" data-fitbox style={colStyle(cols)}>
             {contSectionOf(menu.dishes, pg.start) &&
               <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="m" />}
             {pg.items.map((d, idx) => {
@@ -515,7 +620,7 @@ function MenuContemporaneo({ menu, client }) {
               return (
                 <React.Fragment key={i}>
                   {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="m" />}
-                  <div className="dish-m">
+                  <div className="dish-m" data-di={i}>
                     <div className="dish-left-m">
                       <div className="dish-num-m">{courseNumber(i)}</div>
                     </div>
@@ -553,9 +658,11 @@ function MenuTabula({ menu, client }) {
   const coast = C.decor === "coast";
   const portate = menu.dishes.length;
   const { cols, perPage, sectionBreak } = gridOf(menu, "tabula");
-  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.tabula, sectionBreak);
+  const base = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.tabula, sectionBreak);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
+    fitSig(C.id, "tabula", cols, perPage, sectionBreak, menu.dishes), cols);
   return (
-    <div className="sheet sheet-tabula" data-client={C.id} data-screen-label="Menu Tabula">
+    <div className="sheet sheet-tabula" data-client={C.id} data-screen-label="Menu Tabula" ref={fitRef}>
       {pages.map((pg, pi) => (
         <div className={"page-A4 tabula-page" + (pi === 0 ? "" : " tabula-page-cont")} key={pi}>
           <div className="tab-head">
@@ -584,7 +691,7 @@ function MenuTabula({ menu, client }) {
             </div>
           )}
 
-          <div className="tab-dishes" style={colStyle(cols)}>
+          <div className="tab-dishes" data-fitbox style={colStyle(cols)}>
             {contSectionOf(menu.dishes, pg.start) &&
               <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="t" />}
             {pg.items.map((d, idx) => {
@@ -592,7 +699,7 @@ function MenuTabula({ menu, client }) {
               return (
                 <React.Fragment key={i}>
                   {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="t" />}
-                  <div className="tab-dish">
+                  <div className="tab-dish" data-di={i}>
                     <h3 className="tab-dish-name">
                       {d.name || <span className="placeholder-m">Nome del piatto</span>}
                       <DishPrice value={d.price} />
@@ -728,10 +835,12 @@ function MenuDiario({ menu, client }) {
   const portate = menu.dishes.length;
   // Voci per pagina configurabili (default 3). Le pagine si creano da sole.
   const { perPage, sectionBreak } = gridOf(menu, "diario");
-  const pages = paginateDishes(menu.dishes, 1, perPage, WEIGHTS.diario, sectionBreak);
+  const base = paginateDishes(menu.dishes, 1, perPage, WEIGHTS.diario, sectionBreak);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
+    fitSig(C.id, "diario", 1, perPage, sectionBreak, menu.dishes), 1);
 
   return (
-    <div className="sheet sheet-diario" data-client={C.id} data-screen-label="Menu Diario">
+    <div className="sheet sheet-diario" data-client={C.id} data-screen-label="Menu Diario" ref={fitRef}>
       {/* COVER */}
       <div className="page-A4 dr-cover">
         <div className="dr-top">
@@ -768,7 +877,7 @@ function MenuDiario({ menu, client }) {
             <span className="dr-page-folio">{folio(pIdx + 2, pages.length + 1)}</span>
           </div>
 
-          <div className="dr-entries">
+          <div className="dr-entries" data-fitbox>
             {contSectionOf(menu.dishes, group.start) &&
               <SectionHead title={contSectionOf(menu.dishes, group.start) + " (segue)"} variant="dr" />}
             {group.items.map((d, idx) => {
@@ -776,7 +885,7 @@ function MenuDiario({ menu, client }) {
               return (
                 <React.Fragment key={i}>
                 {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="dr" />}
-                <article className="dr-entry">
+                <article className="dr-entry" data-di={i}>
                   <div className="dr-entry-num">{courseNumber(i)}</div>
                   <div className="dr-entry-body">
                     <h3 className="dr-entry-name">
@@ -814,46 +923,30 @@ function MenuListino({ menu, client }) {
   const coast = C.decor === "coast";
   const { cols, perPage, sectionBreak } = gridOf(menu, "listino");
 
-  // Raggruppa i piatti per sezione, mantenendo l'ordine
-  const groups = [];
-  (menu.dishes || []).forEach(d => {
-    const sec = d.section || "";
-    let g = groups[groups.length - 1];
-    if (!g || g.section !== sec) { g = { section: sec, items: [] }; groups.push(g); }
-    g.items.push(d);
-  });
+  // Impaginazione per indice (come le altre varianti) → in Auto le pagine
+  // vengono poi riempite fino al bordo dalla misurazione reale.
+  const LST_W = { perCol: 18, of: d => 1 + (((d.desc || "").length > 44) ? 0.6 : 0) };
+  const base = paginateDishes(menu.dishes, cols, perPage, LST_W, sectionBreak);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
+    fitSig(C.id, "listino", cols, perPage, sectionBreak, menu.dishes), cols);
 
-  // Impacchetta le sezioni nelle pagine A4. Nessun tetto: le pagine crescono
-  // col contenuto. perPage>0 → tetto di voci per pagina; perPage 0 → auto per "peso".
-  // sectionBreak → ogni sezione parte da una pagina nuova (mai unite tra loro).
-  const wDish = d => 1 + (((d.desc || "").length > 44) ? 0.6 : 0);
-  const wGroup = g => (g.section ? 1 : 0) + g.items.reduce((s, d) => s + wDish(d), 0);
-  const pages = [];
-  if (sectionBreak){
-    groups.forEach(g => {
-      if (perPage > 0 && g.items.length > perPage){
-        for (let i = 0; i < g.items.length; i += perPage)
-          pages.push([{ section: g.section, items: g.items.slice(i, i + perPage), cont: i > 0 }]);
-      } else {
-        pages.push([g]);
-      }
+  // Le voci di una pagina, raggruppate per sezione ("(segue)" se la sezione
+  // arriva dalla pagina precedente).
+  const groupsFor = (pg) => {
+    const out = [];
+    pg.items.forEach((d, k) => {
+      const sec = d.section || "";
+      let g = out[out.length - 1];
+      if (!g || g.section !== sec){
+        out.push({ section: sec, items: [d], off: k, cont: k === 0 && !!contSectionOf(menu.dishes, pg.start) });
+      } else g.items.push(d);
     });
-  } else {
-    const budget = perPage > 0 ? perPage : cols * 20;
-    const measure = perPage > 0 ? (g => g.items.length) : wGroup;
-    let cur = [], curW = 0;
-    groups.forEach(g => {
-      const w = measure(g);
-      if (cur.length && curW + w > budget) { pages.push(cur); cur = []; curW = 0; }
-      cur.push(g); curW += w;
-    });
-    if (cur.length) pages.push(cur);
-  }
-  if (!pages.length) pages.push([]);
+    return out;
+  };
 
   return (
-    <div className="sheet sheet-listino" data-client={C.id} data-screen-label="Menu Listino">
-      {pages.map((pageGroups, pi) => (
+    <div className="sheet sheet-listino" data-client={C.id} data-screen-label="Menu Listino" ref={fitRef}>
+      {pages.map((pg, pi) => (
         <div className="page-A4 lst-page" key={pi}>
           <div className="lst-head">
             <span className="lst-wm"><Brand client={C} className="brand-sm" /></span>
@@ -865,12 +958,12 @@ function MenuListino({ menu, client }) {
 
           {pi === 0 && coast && <CoastWave className="lst-wave" />}
 
-          <div className="lst-body" style={{ columnCount: cols }}>
-            {pageGroups.map((g, gi) => (
+          <div className="lst-body" data-fitbox style={{ columnCount: cols }}>
+            {groupsFor(pg).map((g, gi) => (
               <section className="lst-group" key={gi}>
-                {g.section && <div className="lst-sec">{g.section}{g.cont ? " (segue)" : ""}</div>}
+                {g.section && <div className="lst-sec" data-fithead>{g.section}{g.cont ? " (segue)" : ""}</div>}
                 {g.items.map((d, di) => (
-                  <div className="lst-item" key={di}>
+                  <div className="lst-item" key={di} data-di={pg.start + g.off + di}>
                     <div className="lst-item-head">
                       <span className="lst-item-name">
                         {d.name || "—"}
