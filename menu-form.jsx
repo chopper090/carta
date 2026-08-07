@@ -104,6 +104,74 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
   };
   const sectionGroupsUI = groupsOf(menu.dishes);
 
+  // Macroaree (livello sopra le sezioni), con dentro le loro sezioni
+  const areasUI = (() => {
+    const out = [];
+    sectionGroupsUI.forEach((g, gi) => {
+      const a = (menu.dishes[g.idxs[0]] || {}).area || "";
+      let cur = out[out.length - 1];
+      if (!cur || cur.area !== a){ cur = { area: a, secs: [] }; out.push(cur); }
+      cur.secs.push({ ...g, gi });
+    });
+    return out;
+  })();
+  const areaNames = [...new Set(menu.dishes.map(d => d.area || "").filter(Boolean))];
+
+  // Rinomina una macroarea (aggiorna tutte le sue voci + le impostazioni)
+  const renameArea = React.useCallback((oldName, newName) => {
+    const from = oldName || "", to = (newName || "").trim();
+    if (from === to) return;
+    setMenu(prev => {
+      const dishes = prev.dishes.map(d => ((d.area || "") === from ? { ...d, area: to } : d));
+      const meta = { ...(prev.areaMeta || {}) };
+      if (meta[from]){ if (to) meta[to] = meta[from]; delete meta[from]; }
+      return { ...prev, dishes, areaMeta: meta };
+    });
+  }, [setMenu]);
+
+  // Impaginazione indipendente della macroarea
+  const setAreaMeta = React.useCallback((name, patch) => {
+    setMenu(prev => {
+      const meta = { ...(prev.areaMeta || {}) };
+      const cur = { ...(meta[name || ""] || {}), ...patch };
+      if (!cur.cols && (cur.perPage === undefined || cur.perPage === null)) delete meta[name || ""];
+      else meta[name || ""] = cur;
+      return { ...prev, areaMeta: meta };
+    });
+  }, [setMenu]);
+
+  // Sposta un'intera macroarea (con tutte le sue sezioni e voci)
+  const moveArea = React.useCallback((ai, dir) => {
+    setMenu(prev => {
+      const groups = [];
+      prev.dishes.forEach((d, i) => {
+        const a = d.area || "";
+        let g = groups[groups.length - 1];
+        if (!g || g.a !== a){ g = { a, idxs: [] }; groups.push(g); }
+        g.idxs.push(i);
+      });
+      const j = ai + dir;
+      if (j < 0 || j >= groups.length) return prev;
+      [groups[ai], groups[j]] = [groups[j], groups[ai]];
+      return { ...prev, dishes: groups.flatMap(g => g.idxs.map(k => prev.dishes[k])) };
+    });
+  }, [setMenu]);
+
+  // Sposta un'intera sezione in un'altra macroarea
+  const setSectionArea = React.useCallback((secName, areaName) => {
+    setMenu(prev => ({
+      ...prev,
+      dishes: prev.dishes.map(d => ((d.section || "") === (secName || "") ? { ...d, area: areaName } : d))
+    }));
+  }, [setMenu]);
+
+  // Nuova macroarea (con una sezione vuota dentro)
+  const addArea = () => setMenu(prev => {
+    const n = "Nuova area " + (new Set(prev.dishes.map(d => d.area || "").filter(Boolean)).size + 1);
+    return { ...prev, dishes: [...prev.dishes,
+      { name: "", area: n, section: "Nuova sezione", desc: "", story: "", image: null, price: null, takeaway: false, allergens: [] }] };
+  });
+
   // Sposta un'intera sezione (con tutti i suoi piatti) su/giù, scambiandola
   // con la sezione adiacente.
   const moveSection = (gi, dir) => {
@@ -381,6 +449,7 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
           <span className="mini-btn-row">
             <button className="mini-btn" onClick={addDish}>+ voce</button>
             <button className="mini-btn" onClick={addSection}>+ sezione</button>
+            <button className="mini-btn" onClick={addArea}>+ macroarea</button>
           </span>
         </div>
 
@@ -394,7 +463,21 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
           {sectionNames.map(s => <option key={s} value={s} />)}
         </datalist>
         <div className="dishes-form">
-          {sectionGroupsUI.map((g, gi) => (
+          {areasUI.map((A, ai) => (
+            <React.Fragment key={"a" + ai}>
+              {(A.area || areasUI.length > 1) && (
+                <AreaRow
+                  area={A.area}
+                  index={ai}
+                  total={areasUI.length}
+                  meta={(menu.areaMeta || {})[A.area || ""] || {}}
+                  maxCols={((typeof GRID_DEFAULTS !== "undefined" && GRID_DEFAULTS) || {})[variant]?.maxCols || 1}
+                  onRename={(v) => renameArea(A.area, v)}
+                  onMeta={(patch) => setAreaMeta(A.area, patch)}
+                  onMove={(d) => moveArea(ai, d)}
+                />
+              )}
+          {A.secs.map(({ gi, ...g }) => (
             <React.Fragment key={gi}>
               <div className={"section-move-row" + (((menu.sectionMeta || {})[g.sec] || {}).takeaway ? " sec-takeaway" : "")}>
                 {((menu.sectionMeta || {})[g.sec] || {}).divider && <span className="sec-divider-mark" aria-hidden="true"></span>}
@@ -417,6 +500,16 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
                     title="Aggiungi una voce in questa sezione">+</button>
                 </div>
               </div>
+              {areaNames.length > 0 && (
+                <div className="sec-area-pick">
+                  <span>macroarea</span>
+                  <select value={(menu.dishes[g.idxs[0]] || {}).area || ""}
+                    onChange={e => setSectionArea(g.sec, e.target.value)}>
+                    <option value="">— nessuna —</option>
+                    {areaNames.map(an => <option key={an} value={an}>{an}</option>)}
+                  </select>
+                </div>
+              )}
               {g.idxs.map(i => (
                 <DishEditor
                   key={i}
@@ -435,6 +528,8 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
                   sectionsKey={sectionsKey}
                 />
               ))}
+            </React.Fragment>
+          ))}
             </React.Fragment>
           ))}
         </div>
@@ -463,6 +558,65 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
         <span>v 1.2</span>
       </div>
     </aside>
+  );
+}
+
+// ============================================================
+// MACROAREA — separatore arancione a tutta pagina con nome proprio e
+// impaginazione (colonne + voci per pagina) indipendente dalle altre.
+// ============================================================
+function AreaRow({ area, index, total, meta, maxCols, onRename, onMeta, onMove }){
+  const [v, setV] = useState(area || "");
+  const [editing, setEditing] = useState(false);
+  useEffect(() => { if (!editing) setV(area || ""); }, [area, editing]);
+  const pp = meta.perPage;
+  const stepPP = (d) => {
+    if (pp === undefined || pp === null) { onMeta({ perPage: 8 }); return; }
+    if (pp === 0) { onMeta({ perPage: 1 }); return; }
+    onMeta({ perPage: Math.max(1, pp + d) });
+  };
+  return (
+    <div className="area-row">
+      <div className="area-row-top">
+        <span className="area-row-badge">{index + 1}</span>
+        <input className="area-row-name" value={v}
+          placeholder="Nome macroarea (es. Servizio al Tavolo)"
+          onFocus={() => setEditing(true)}
+          onChange={e => setV(e.target.value)}
+          onBlur={() => { setEditing(false); onRename(v); }}
+          onKeyDown={e => { if (e.key === "Enter") e.target.blur(); }} />
+        <div className="section-move-ctrls">
+          <button type="button" className="ctrl-btn" disabled={index === 0}
+            onClick={() => onMove(-1)} title="Sposta la macroarea su">↑</button>
+          <button type="button" className="ctrl-btn" disabled={index === total - 1}
+            onClick={() => onMove(1)} title="Sposta la macroarea giù">↓</button>
+        </div>
+      </div>
+      <div className="area-row-grid">
+        {maxCols > 1 && (
+          <span className="area-mini">
+            <em>colonne</em>
+            <span className="area-cols">
+              {Array.from({ length: maxCols }, (_, k) => k + 1).map(n => (
+                <button key={n} type="button"
+                  className={(meta.cols === n ? "on" : "")}
+                  onClick={() => onMeta({ cols: meta.cols === n ? 0 : n })}>{n}</button>
+              ))}
+            </span>
+          </span>
+        )}
+        <span className="area-mini">
+          <em>voci/pagina</em>
+          <span className="area-pp">
+            <button type="button" onClick={() => stepPP(-1)}>−</button>
+            <b>{(pp === undefined || pp === null) ? "auto" : (pp === 0 ? "auto" : pp)}</b>
+            <button type="button" onClick={() => stepPP(+1)}>+</button>
+            <button type="button" className="area-pp-reset" title="Come lo stile"
+              onClick={() => onMeta({ perPage: null, cols: 0 })}>⤺</button>
+          </span>
+        </span>
+      </div>
+    </div>
   );
 }
 

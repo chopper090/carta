@@ -32,6 +32,14 @@ ingrandisce e nasconde qualunque blocco (`FREE_BLOCKS`, `tagFreeBlocks`,
 `applyFreeLayout`, `installFreeDrag`). Stili inline → valgono anche in
 stampa/PDF/export. Si attiva col tasto ✥ nella barra dell'anteprima.
 
+**Macroaree.** Livello sopra le sezioni: `dish.area`. Ogni macroarea apre con un
+separatore arancione a tutta pagina (`AreaBand`) col suo nome e ha impaginazione
+indipendente in `menu.areaMeta[nome] = { cols, perPage }` (`areaSettings` fa il
+merge con le impostazioni della variante). Il motore impagina "per indice":
+`paginateDishes(dishes, colsAt, perPageAt, weight, breakAt)` e
+`useFittedPages(base, dishes, breakAt, enabled, sig, colsAt)`. La banda è un
+blocco `FREE_BLOCKS` → si sposta e ridimensiona in modalità libera.
+
 **Sezioni.** `menu.sectionMeta[nome] = { divider, takeaway }` — separatore arancione
 prima della sezione e marchio "asporto". Sul piatto: `takeaway: true` mostra
 l'etichetta arancione. Dal form si rinomina la sezione (propaga a tutte le sue

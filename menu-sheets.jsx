@@ -144,6 +144,7 @@ const FREE_BLOCKS = [
   ".dr-page-head", ".dr-entries", ".dr-page-foot",
   ".lst-head", ".lst-body", ".lst-foot",
   // singoli elementi
+  ".area-band",
   ".menu-section", ".dish-c", ".dish-m", ".tab-dish",
   ".ed-dish", ".dr-entry", ".lst-group", ".lst-item"
 ];
@@ -298,26 +299,6 @@ const WEIGHTS = {
   diario:        { perCol: 3.4, of: (d,i,l)=> 1 + (((d.story||"").length > 200) ? 0.6 : 0) + (startsSection(l,i) ? 0.4 : 0) }
 };
 
-// Impacchetta una lista (già omogenea) in pagine → [{ start, items }],
-// start = indice del primo piatto RELATIVO alla lista passata.
-function _packPages(list, cols, perPage, weight){
-  const pages = [];
-  if (perPage > 0){
-    for (let i = 0; i < list.length; i += perPage) pages.push({ start: i, items: list.slice(i, i + perPage) });
-    return pages;
-  }
-  const w = weight || { perCol: 12, of: ()=> 1 };
-  const capAt = (pi) => Math.max(1, cols) * ((pi === 0 && w.firstPerCol) ? w.firstPerCol : (w.perCol || 12));
-  let start = 0, curW = 0;
-  for (let i = 0; i < list.length; i++){
-    const dw = w.of(list[i], i, list);
-    if (i > start && curW + dw > capAt(pages.length)){ pages.push({ start, items: list.slice(start, i) }); start = i; curW = 0; }
-    curW += dw;
-  }
-  pages.push({ start, items: list.slice(start) });
-  return pages;
-}
-
 // Se la pagina inizia in mezzo a una sezione, restituisce il nome della sezione
 // (serve a ristampare l'intestazione come "Amari (segue)") — altrimenti null.
 const contSectionOf = (dishes, start) => {
@@ -326,13 +307,49 @@ const contSectionOf = (dishes, start) => {
   return (s && dishes[start - 1] && dishes[start - 1].section === s) ? s : null;
 };
 
-// Numerazione pagine: romana finché è leggibile, araba da 10 pagine in su
-// (con 54 pagine "XLII / LIV" è illeggibile).
+// Numerazione pagine: romana finché è leggibile, araba da 10 pagine in su.
 const folio = (n, total) => (total > 10 ? String(n) : romanize(n));
 
 // Liste con prezzo per voce (bar/listino): "coperti" e "portate" non hanno senso.
 const isPriceList = (menu) =>
-  (menu && menu.dishes || []).some(d => d.price !== null && d.price !== undefined);
+  ((menu && menu.dishes) || []).some(d => d.price !== null && d.price !== undefined);
+
+// ============================================================
+// MACROAREE — livello sopra le sezioni: `dish.area`.
+// Ogni macroarea ha nome proprio, un separatore arancione a tutta
+// pagina e impaginazione (colonne + voci per pagina) indipendente,
+// in `menu.areaMeta[nome] = { cols, perPage }`.
+// ============================================================
+const areaOf = (d) => (d && d.area) || "";
+
+// Impostazioni effettive per una macroarea: partono da quelle della
+// variante e vengono sovrascritte solo dove la macroarea decide.
+const areaSettings = (menu, variant, area) => {
+  const g = gridOf(menu, variant);
+  const a = ((menu && menu.areaMeta) || {})[area || ""] || {};
+  const maxc = g.maxCols;
+  return {
+    cols: Math.max(1, Math.min(maxc, a.cols || g.cols)),
+    perPage: (a.perPage === 0 || a.perPage) ? Math.max(0, a.perPage) : g.perPage,
+    sectionBreak: g.sectionBreak
+  };
+};
+
+// Macroaree nell'ordine in cui compaiono → [{ area, start, items }]
+function areaGroups(list){
+  const out = [];
+  (list || []).forEach((d, i) => {
+    const a = areaOf(d);
+    let g = out[out.length - 1];
+    if (!g || g.area !== a){ g = { area: a, start: i, items: [] }; out.push(g); }
+    g.items.push(d);
+  });
+  return out;
+}
+
+// La pagina apre una macroarea? (serve a stampare il separatore + nome)
+const opensArea = (dishes, start) =>
+  start === 0 || areaOf(dishes[start]) !== areaOf(dishes[start - 1]);
 
 // Raggruppa i piatti per sezione consecutiva → [{ sec, start, items }].
 function sectionGroups(list){
@@ -347,21 +364,28 @@ function sectionGroups(list){
 }
 
 // Spezza la lista dei piatti in pagine → [{ start, items }].
-// start = indice globale del primo piatto (serve a numerazione e sezioni).
-// sectionBreak: ogni sezione parte da una pagina nuova (e ne occupa quante servono).
-function paginateDishes(dishes, cols, perPage, weight, sectionBreak){
+// Tutto è "per indice": colonne, voci per pagina e salti pagina possono
+// cambiare da una macroarea all'altra.
+function paginateDishes(dishes, colsAt, perPageAt, weight, breakAt){
   const list = dishes || [];
   if (!list.length) return [{ start: 0, items: [] }];
-  if (!sectionBreak){
-    const p = _packPages(list, cols, perPage, weight);
-    return p.length ? p : [{ start: 0, items: [] }];
-  }
+  const w = weight || { perCol: 12, of: () => 1 };
   const pages = [];
-  sectionGroups(list).forEach(g => {
-    _packPages(g.items, cols, perPage, weight).forEach(p =>
-      pages.push({ start: g.start + p.start, items: p.items }));
-  });
-  return pages.length ? pages : [{ start: 0, items: [] }];
+  let start = 0, acc = 0, count = 0;
+  for (let i = 0; i < list.length; i++){
+    const pp = perPageAt(i);
+    const cap = Math.max(1, colsAt(i)) *
+      ((pages.length === 0 && w.firstPerCol) ? w.firstPerCol : (w.perCol || 12));
+    const dw = w.of(list[i], i, list);
+    const full = pp > 0 ? (count >= pp) : (acc + dw > cap);
+    if (i > start && (breakAt(i) || full)){
+      pages.push({ start, items: list.slice(start, i) });
+      start = i; acc = 0; count = 0;
+    }
+    acc += dw; count++;
+  }
+  pages.push({ start, items: list.slice(start) });
+  return pages;
 }
 
 // ============================================================
@@ -370,16 +394,15 @@ function paginateDishes(dishes, cols, perPage, weight, sectionBreak){
 // vera delle pagine renderizzate e spostiamo le voci finché ogni foglio è
 // pieno quanto può senza sbordare. Funziona anche con più colonne
 // (l'eccesso crea una colonna in più → lo vediamo da scrollWidth).
-// Le pagine sono rappresentate come indici di inizio: starts[i] = prima voce
-// della pagina i. Nessun limite al numero di pagine.
+// `breakAt(i)` = salto forzato (macroarea o sezione); `colsAt(i)` = colonne
+// della macroarea a cui la voce appartiene. Nessun limite di pagine.
 // ============================================================
-// Firma degli input: se cambia, l'adattamento riparte da zero.
 const fitSig = (clientId, variant, cols, perPage, sectionBreak, dishes) =>
   [clientId, variant, cols, perPage, sectionBreak ? 1 : 0, (dishes || []).length,
    (dishes || []).map(d => (d.name || "").length + "." + (d.desc || "").length + "." +
-     (d.story || "").length + "." + (d.section || "")).join("|")].join("~");
+     (d.story || "").length + "." + (d.section || "") + "." + (d.area || "")).join("|")].join("~");
 
-function useFittedPages(basePages, dishes, sectionBreak, enabled, sig, cols){
+function useFittedPages(basePages, dishes, breakAt, enabled, sig, colsAt){
   const rootRef = useRef(null);
   const [starts, setStarts] = useState(() => basePages.map(p => p.start));
   const phase = useRef(0);               // 0 = da misurare, 1+ = verifiche
@@ -399,8 +422,7 @@ function useFittedPages(basePages, dishes, sectionBreak, enabled, sig, cols){
     const N = dishes.length;
     if (!N || !boxes.length) return;
 
-    const secOf = (i) => (dishes[i] && dishes[i].section) || "";
-    const breaksAt = (i) => sectionBreak && i > 0 && secOf(i) !== secOf(i - 1);
+    const breaksAt = (i) => i > 0 && breakAt(i);
 
     // ---- FASE 0: misura una volta l'altezza vera di ogni voce e calcola
     // l'impaginazione in un colpo solo (niente decine di ri-render).
@@ -426,7 +448,7 @@ function useFittedPages(basePages, dishes, sectionBreak, enabled, sig, cols){
       const next = [0];
       let acc = 0;
       for (let i = 0; i < N; i++){
-        const avail = (next.length === 1 ? A0 : A1) * Math.max(1, cols || 1);
+        const avail = (next.length === 1 ? A0 : A1) * Math.max(1, colsAt(i) || 1);
         if (i > 0 && i !== next[next.length - 1] &&
             (breaksAt(i) || acc + cost[i] > avail)){
           next.push(i); acc = 0;
@@ -449,7 +471,7 @@ function useFittedPages(basePages, dishes, sectionBreak, enabled, sig, cols){
       const from = next[i], to = endOf(next, i);
       if (to - from > 1 && over(boxes[i])){
         const moved = to - 1;
-        if (i + 1 < next.length && (!sectionBreak || secOf(moved) === secOf(next[i + 1]))) next[i + 1] = moved;
+        if (i + 1 < next.length && !breaksAt(next[i + 1])) next[i + 1] = moved;
         else next.splice(i + 1, 0, moved);
         changed = true;
         break;
@@ -494,6 +516,15 @@ const SectionHead = ({ title, variant, divider, takeaway }) => (
     <span className="ms-rule" aria-hidden="true"></span>
     <span className="ms-label">{title}{takeaway && <em className="ms-tag">asporto</em>}</span>
     <span className="ms-rule" aria-hidden="true"></span>
+  </div>
+);
+
+// Separatore a tutta pagina che apre una macroarea (con il suo nome).
+const AreaBand = ({ name }) => (
+  <div className="area-band">
+    <span className="area-band-rule" aria-hidden="true"></span>
+    {name ? <span className="area-band-name">{name}</span> : null}
+    <span className="area-band-rule" aria-hidden="true"></span>
   </div>
 );
 
@@ -592,9 +623,15 @@ function MenuClassico({ menu, client }) {
   const portate = menu.dishes.length;
   const L = layoutOf(menu, "classico");
   const { cols, perPage, sectionBreak } = gridOf(menu, "classico");
-  const base = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.classico, sectionBreak);
-  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
-    fitSig(C.id, "classico", cols, perPage, sectionBreak, menu.dishes), cols);
+    // impostazioni per indice: ogni macroarea ha le sue colonne / voci per pagina
+  const AS = (i) => areaSettings(menu, "classico", areaOf(menu.dishes[i]));
+  const colsAt = (i) => AS(i).cols;
+  const perPageAt = (i) => AS(i).perPage;
+  const breakAt = (i) => areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) ||
+    (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
+  const base = paginateDishes(menu.dishes, colsAt, perPageAt, WEIGHTS.classico, breakAt);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
+    fitSig(C.id, "classico", JSON.stringify(menu.areaMeta || {}) + cols, perPage, sectionBreak, menu.dishes), colsAt);
   return (
     <div className="sheet sheet-classico" data-client={C.id} data-screen-label="Menu Classico" ref={fitRef}>
       <div className="page-A4 cover-page-c">
@@ -639,7 +676,8 @@ function MenuClassico({ menu, client }) {
             </div>
           </div>
 
-          <div className="dishes-c" data-fitbox style={colStyle(cols)}>
+          {opensArea(menu.dishes, pg.start) && areaOf(menu.dishes[pg.start]) && <AreaBand name={areaOf(menu.dishes[pg.start])} />}
+          <div className="dishes-c" data-fitbox style={colStyle(colsAt(pg.start))}>
             {contSectionOf(menu.dishes, pg.start) &&
               <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="c" takeaway={secMeta(menu, contSectionOf(menu.dishes, pg.start)).takeaway} />}
             {pg.items.map((d, idx) => {
@@ -697,9 +735,15 @@ function MenuContemporaneo({ menu, client }) {
   const portate = menu.dishes.length;
   const L = layoutOf(menu, "contemporaneo");
   const { cols, perPage, sectionBreak } = gridOf(menu, "contemporaneo");
-  const base = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.contemporaneo, sectionBreak);
-  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
-    fitSig(C.id, "contemporaneo", cols, perPage, sectionBreak, menu.dishes), cols);
+    // impostazioni per indice: ogni macroarea ha le sue colonne / voci per pagina
+  const AS = (i) => areaSettings(menu, "contemporaneo", areaOf(menu.dishes[i]));
+  const colsAt = (i) => AS(i).cols;
+  const perPageAt = (i) => AS(i).perPage;
+  const breakAt = (i) => areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) ||
+    (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
+  const base = paginateDishes(menu.dishes, colsAt, perPageAt, WEIGHTS.contemporaneo, breakAt);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
+    fitSig(C.id, "contemporaneo", JSON.stringify(menu.areaMeta || {}) + cols, perPage, sectionBreak, menu.dishes), colsAt);
   return (
     <div className="sheet sheet-contemporaneo" data-client={C.id} data-screen-label="Menu Contemporaneo" ref={fitRef}>
       <div className="page-A4 cover-page-m">
@@ -751,7 +795,8 @@ function MenuContemporaneo({ menu, client }) {
             <span className="inner-name-m">{menu.name} · {portate} {isPriceList(menu) ? "voci" : "portate"}</span>
           </div>
 
-          <div className="dishes-m" data-fitbox style={colStyle(cols)}>
+          {opensArea(menu.dishes, pg.start) && areaOf(menu.dishes[pg.start]) && <AreaBand name={areaOf(menu.dishes[pg.start])} />}
+          <div className="dishes-m" data-fitbox style={colStyle(colsAt(pg.start))}>
             {contSectionOf(menu.dishes, pg.start) &&
               <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="m" takeaway={secMeta(menu, contSectionOf(menu.dishes, pg.start)).takeaway} />}
             {pg.items.map((d, idx) => {
@@ -798,9 +843,15 @@ function MenuTabula({ menu, client }) {
   const coast = C.decor === "coast";
   const portate = menu.dishes.length;
   const { cols, perPage, sectionBreak } = gridOf(menu, "tabula");
-  const base = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.tabula, sectionBreak);
-  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
-    fitSig(C.id, "tabula", cols, perPage, sectionBreak, menu.dishes), cols);
+    // impostazioni per indice: ogni macroarea ha le sue colonne / voci per pagina
+  const AS = (i) => areaSettings(menu, "tabula", areaOf(menu.dishes[i]));
+  const colsAt = (i) => AS(i).cols;
+  const perPageAt = (i) => AS(i).perPage;
+  const breakAt = (i) => areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) ||
+    (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
+  const base = paginateDishes(menu.dishes, colsAt, perPageAt, WEIGHTS.tabula, breakAt);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
+    fitSig(C.id, "tabula", JSON.stringify(menu.areaMeta || {}) + cols, perPage, sectionBreak, menu.dishes), colsAt);
   return (
     <div className="sheet sheet-tabula" data-client={C.id} data-screen-label="Menu Tabula" ref={fitRef}>
       {pages.map((pg, pi) => (
@@ -831,7 +882,8 @@ function MenuTabula({ menu, client }) {
             </div>
           )}
 
-          <div className="tab-dishes" data-fitbox style={colStyle(cols)}>
+          {opensArea(menu.dishes, pg.start) && areaOf(menu.dishes[pg.start]) && <AreaBand name={areaOf(menu.dishes[pg.start])} />}
+          <div className="tab-dishes" data-fitbox style={colStyle(colsAt(pg.start))}>
             {contSectionOf(menu.dishes, pg.start) &&
               <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="t" takeaway={secMeta(menu, contSectionOf(menu.dishes, pg.start)).takeaway} />}
             {pg.items.map((d, idx) => {
@@ -872,7 +924,10 @@ function MenuEditoriale({ menu, client }) {
   const portate = menu.dishes.length;
   // Voci per pagina configurabili (default 2). Le pagine si creano da sole.
   const { perPage, sectionBreak } = gridOf(menu, "editoriale");
-  const pages = paginateDishes(menu.dishes, 1, perPage, WEIGHTS.editoriale, sectionBreak);
+  const AS = (i) => areaSettings(menu, "editoriale", areaOf(menu.dishes[i]));
+  const breakAt = (i) => areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) ||
+    (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
+  const pages = paginateDishes(menu.dishes, () => 1, (i) => AS(i).perPage, WEIGHTS.editoriale, breakAt);
 
   // Find a hero image (first dish with image, otherwise null → placeholder)
   const heroSrc = menu.dishes.find(d => d.image)?.image || null;
@@ -917,6 +972,7 @@ function MenuEditoriale({ menu, client }) {
             <span className="ed-page-folio">{folio(pIdx + 2, pages.length + 1)}</span>
           </div>
 
+          {opensArea(menu.dishes, group.start) && areaOf(menu.dishes[group.start]) && <AreaBand name={areaOf(menu.dishes[group.start])} />}
           <div className="ed-page-body">
             {group.items.map((d, idx) => {
               const i = group.start + idx;
@@ -977,9 +1033,15 @@ function MenuDiario({ menu, client }) {
   const portate = menu.dishes.length;
   // Voci per pagina configurabili (default 3). Le pagine si creano da sole.
   const { perPage, sectionBreak } = gridOf(menu, "diario");
-  const base = paginateDishes(menu.dishes, 1, perPage, WEIGHTS.diario, sectionBreak);
-  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
-    fitSig(C.id, "diario", 1, perPage, sectionBreak, menu.dishes), 1);
+    // impostazioni per indice: ogni macroarea ha le sue colonne / voci per pagina
+  const AS = (i) => areaSettings(menu, "diario", areaOf(menu.dishes[i]));
+  const colsAt = (i) => 1;
+  const perPageAt = (i) => AS(i).perPage;
+  const breakAt = (i) => areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) ||
+    (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
+  const base = paginateDishes(menu.dishes, colsAt, perPageAt, WEIGHTS.diario, breakAt);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
+    fitSig(C.id, "diario", JSON.stringify(menu.areaMeta || {}) + 1, perPage, sectionBreak, menu.dishes), colsAt);
 
   return (
     <div className="sheet sheet-diario" data-client={C.id} data-screen-label="Menu Diario" ref={fitRef}>
@@ -1019,6 +1081,7 @@ function MenuDiario({ menu, client }) {
             <span className="dr-page-folio">{folio(pIdx + 2, pages.length + 1)}</span>
           </div>
 
+          {opensArea(menu.dishes, group.start) && areaOf(menu.dishes[group.start]) && <AreaBand name={areaOf(menu.dishes[group.start])} />}
           <div className="dr-entries" data-fitbox>
             {contSectionOf(menu.dishes, group.start) &&
               <SectionHead title={contSectionOf(menu.dishes, group.start) + " (segue)"} variant="dr" takeaway={secMeta(menu, contSectionOf(menu.dishes, group.start)).takeaway} />}
@@ -1069,9 +1132,15 @@ function MenuListino({ menu, client }) {
   // Impaginazione per indice (come le altre varianti) → in Auto le pagine
   // vengono poi riempite fino al bordo dalla misurazione reale.
   const LST_W = { perCol: 18, of: d => 1 + (((d.desc || "").length > 44) ? 0.6 : 0) };
-  const base = paginateDishes(menu.dishes, cols, perPage, LST_W, sectionBreak);
-  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
-    fitSig(C.id, "listino", cols, perPage, sectionBreak, menu.dishes), cols);
+    // impostazioni per indice: ogni macroarea ha le sue colonne / voci per pagina
+  const AS = (i) => areaSettings(menu, "listino", areaOf(menu.dishes[i]));
+  const colsAt = (i) => AS(i).cols;
+  const perPageAt = (i) => AS(i).perPage;
+  const breakAt = (i) => areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) ||
+    (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
+  const base = paginateDishes(menu.dishes, colsAt, perPageAt, LST_W, breakAt);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
+    fitSig(C.id, "listino", JSON.stringify(menu.areaMeta || {}) + cols, perPage, sectionBreak, menu.dishes), colsAt);
 
   // Le voci di una pagina, raggruppate per sezione ("(segue)" se la sezione
   // arriva dalla pagina precedente).
@@ -1101,7 +1170,8 @@ function MenuListino({ menu, client }) {
 
           {pi === 0 && coast && <CoastWave className="lst-wave" />}
 
-          <div className="lst-body" data-fitbox style={{ columnCount: cols }}>
+          {opensArea(menu.dishes, pg.start) && areaOf(menu.dishes[pg.start]) && <AreaBand name={areaOf(menu.dishes[pg.start])} />}
+          <div className="lst-body" data-fitbox style={{ columnCount: colsAt(pg.start) }}>
             {groupsFor(pg).map((g, gi) => (
               <section className="lst-group" key={gi}>
                 {g.section && (
@@ -1154,7 +1224,7 @@ function romanize(n){
 Object.assign(window, {
   MenuClassico, MenuContemporaneo, MenuTabula, MenuEditoriale, MenuDiario, MenuListino,
   Brand, DishPrice, CoastWave, Citrus, Draggable, DragCtx,
-  formatDate, formatPrice, ALLERGENI, secMeta,
+  formatDate, formatPrice, ALLERGENI, secMeta, areaOf, areaGroups, areaSettings,
   GRID_DEFAULTS, gridOf, paginateDishes, WEIGHTS, colStyle, sectionGroups,
   FREE_BLOCKS, tagFreeBlocks, applyFreeLayout, installFreeDrag
 });
