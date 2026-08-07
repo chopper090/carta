@@ -2353,6 +2353,34 @@ body{
   letter-spacing: .04em;
 }
 
+/* Anteprima · MODALITÀ LIBERA (sposta/ingrandisci/nascondi i blocchi) */
+.preview-pane.free-mode [data-free-id]{ cursor: move; }
+.preview-pane.free-mode [data-free-id]:hover{
+  outline: 1px dashed color-mix(in srgb, var(--gold) 75%, transparent);
+  outline-offset: 2px;
+}
+.preview-pane [data-free-id].free-selected{
+  outline: 1.5px solid var(--gold) !important;
+  outline-offset: 2px;
+}
+.preview-pane [data-free-id].dragging{ opacity: .85; }
+.ptb-free.on{ background: var(--gold); color: var(--white); border-color: var(--gold); }
+.ptb-freebar{ display: flex; align-items: center; gap: 2px; }
+.ptb-freebar button{
+  min-width: 26px; height: 22px; padding: 0 5px; border: 1px solid var(--line-soft);
+  background: var(--cream-deep); color: var(--ink); border-radius: 5px; cursor: pointer;
+  font-family: var(--f-mono); font-size: 10px; line-height: 1;
+}
+.ptb-freebar button:hover{ border-color: var(--gold); background: var(--gold-soft); }
+.ptb-freeval{ font-family: var(--f-mono); font-size: 9.5px; color: var(--warm-grey); min-width: 30px; text-align: center; }
+
+/* Anteprima · avviso "non salvato" (spazio browser esaurito) */
+.ptb-warn{
+  font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: #7a2018; background: #f6d5cf; border: 1px solid #d99b90;
+  padding: 4px 8px; border-radius: 6px; white-space: nowrap; cursor: help;
+}
+
 /* Editor · toggle "sezione = nuova pagina" */
 .section-break-toggle{
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;

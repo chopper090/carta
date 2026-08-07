@@ -4,7 +4,7 @@
 // Client-aware: brand, logo, palette e font dipendono dal cliente.
 // ============================================================
 
-const { useState, useEffect, useRef, useMemo, useContext } = React;
+const { useRef, useContext, useState, useLayoutEffect } = React;
 
 // ============================================================
 // Drag & drop della copertina — riposizionamento libero con
@@ -124,6 +124,137 @@ function Draggable({ id, offset, children }){
 const layoutOf = (menu, variant) => (menu && menu.layout && menu.layout[variant]) || {};
 
 // ============================================================
+// MODALITÀ LIBERA ("Canva") — ogni blocco della pagina si sposta,
+// si ingrandisce e si nasconde. Riusa lo stesso magazzino delle
+// posizioni di copertina: menu.layout[variante][id] = {x,y,s,h}.
+// Gli stili sono inline, quindi valgono anche in stampa/PDF/export.
+// ============================================================
+const FREE_BLOCKS = [
+  // blocchi di copertina
+  ".cover-center-c", ".cover-chef-c", ".cover-footer-c",
+  ".cover-top-m", ".cover-body-m", ".cover-foot-m",
+  ".tab-head", ".tab-title", ".tab-foot",
+  ".ed-cover-top", ".ed-cover-body", ".ed-cover-foot",
+  ".dr-top", ".dr-cover-body", ".dr-cover-foot",
+  // blocchi delle pagine interne
+  ".inner-head-c", ".dishes-c", ".inner-footer-c",
+  ".inner-top-m", ".dishes-m", ".inner-foot-m",
+  ".tab-title-cont", ".tab-dishes",
+  ".ed-page-head", ".ed-page-body", ".ed-page-foot",
+  ".dr-page-head", ".dr-entries", ".dr-page-foot",
+  ".lst-head", ".lst-body", ".lst-foot",
+  // singoli elementi
+  ".menu-section", ".dish-c", ".dish-m", ".tab-dish",
+  ".ed-dish", ".dr-entry", ".lst-group", ".lst-item"
+];
+
+const freeKey = (sel) => sel.replace(/[^a-z0-9-]/gi, "");
+
+// Assegna a ogni blocco un id stabile (pagina + tipo + progressivo).
+function tagFreeBlocks(root){
+  root.querySelectorAll("[data-free-id]").forEach(el => el.removeAttribute("data-free-id"));
+  [...root.querySelectorAll(".page-A4")].forEach((pg, pi) => {
+    const n = {};
+    FREE_BLOCKS.forEach(sel => {
+      const k = freeKey(sel);
+      pg.querySelectorAll(sel).forEach(el => {
+        if (el.hasAttribute("data-drag-id")) return;   // già gestito dalla copertina
+        n[k] = n[k] || 0;
+        el.setAttribute("data-free-id", pi + ":" + k + ":" + (n[k]++));
+      });
+    });
+  });
+}
+
+// Applica posizione / dimensione / visibilità salvate.
+function applyFreeLayout(root, layout){
+  root.querySelectorAll("[data-free-id]").forEach(el => {
+    const v = layout[el.getAttribute("data-free-id")];
+    el.style.transform = (v && (v.x || v.y)) ? `translate(${v.x}px, ${v.y}px)` : "";
+    el.style.fontSize   = (v && v.s && v.s !== 1) ? (v.s * 100) + "%" : "";
+    el.style.opacity    = (v && v.h) ? "0" : "";
+    el.style.pointerEvents = (v && v.h) ? "none" : "";
+  });
+}
+
+// Trascinamento con guide di allineamento e snap (stesso comportamento
+// della copertina, ma su qualunque blocco).
+function installFreeDrag(root, { zoom, layout, onCommit, onSelect, selectedId }){
+  const TH = 6;
+  const onDown = (e) => {
+    const el = e.target.closest("[data-free-id]");
+    if (!el || !root.contains(el)) return;
+    if (e.button != null && e.button !== 0) return;
+    const page = el.closest(".page-A4");
+    if (!page) return;
+    e.preventDefault(); e.stopPropagation();
+
+    const id = el.getAttribute("data-free-id");
+    onSelect(id);
+    const cur0 = layout[id] || {};
+    const base = { x: cur0.x || 0, y: cur0.y || 0 };
+    const start = { x: e.clientX, y: e.clientY };
+    const z = (zoom && zoom > 0) ? zoom : 1;
+    const pr = page.getBoundingClientRect();
+    const vx = [pr.left, pr.left + pr.width / 2, pr.right];
+    const hy = [pr.top, pr.top + pr.height / 2, pr.bottom];
+    page.querySelectorAll("[data-free-id]").forEach(d => {
+      if (d === el || el.contains(d) || d.contains(el)) return;
+      const r = d.getBoundingClientRect();
+      vx.push(r.left, r.left + r.width / 2, r.right);
+      hy.push(r.top, r.top + r.height / 2, r.bottom);
+    });
+    const layer = document.getElementById("dragGuideLayer");
+    const clear = () => { if (layer) layer.innerHTML = ""; };
+    const guide = (o, pos) => {
+      if (!layer) return;
+      const l = document.createElement("div");
+      l.className = "drag-guide " + o;
+      if (o === "v"){ l.style.left = pos + "px"; l.style.top = pr.top + "px"; l.style.height = pr.height + "px"; }
+      else { l.style.top = pos + "px"; l.style.left = pr.left + "px"; l.style.width = pr.width + "px"; }
+      layer.appendChild(l);
+    };
+
+    el.classList.add("dragging");
+    let cur = { ...base }, moved = false;
+
+    const onMove = (ev) => {
+      let nx = base.x + (ev.clientX - start.x) / z;
+      let ny = base.y + (ev.clientY - start.y) / z;
+      if (Math.abs(ev.clientX - start.x) + Math.abs(ev.clientY - start.y) > 3) moved = true;
+      el.style.transform = `translate(${nx}px, ${ny}px)`;
+      const r = el.getBoundingClientRect();
+      clear();
+      let bx = null;
+      vx.forEach(L => [r.left, r.left + r.width / 2, r.right].forEach(pt => {
+        const d = L - pt;
+        if (Math.abs(d) <= TH && (bx === null || Math.abs(d) < Math.abs(bx.d))) bx = { d, L };
+      }));
+      if (bx){ nx += bx.d / z; guide("v", bx.L); }
+      let by = null;
+      hy.forEach(L => [r.top, r.top + r.height / 2, r.bottom].forEach(pt => {
+        const d = L - pt;
+        if (Math.abs(d) <= TH && (by === null || Math.abs(d) < Math.abs(by.d))) by = { d, L };
+      }));
+      if (by){ ny += by.d / z; guide("h", by.L); }
+      el.style.transform = `translate(${nx}px, ${ny}px)`;
+      cur = { x: Math.round(nx), y: Math.round(ny) };
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      el.classList.remove("dragging");
+      clear();
+      if (moved) onCommit(id, cur);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  root.addEventListener("pointerdown", onDown);
+  return () => root.removeEventListener("pointerdown", onDown);
+}
+
+// ============================================================
 // Impaginazione per-variante — colonne + voci per pagina.
 // Le impostazioni vivono in menu.grid[variante] = { cols, perPage }.
 //   perPage === 0  → automatico: le pagine A4 si riempiono da sole in base
@@ -187,6 +318,22 @@ function _packPages(list, cols, perPage, weight){
   return pages;
 }
 
+// Se la pagina inizia in mezzo a una sezione, restituisce il nome della sezione
+// (serve a ristampare l'intestazione come "Amari (segue)") — altrimenti null.
+const contSectionOf = (dishes, start) => {
+  if (!start) return null;
+  const s = dishes[start] && dishes[start].section;
+  return (s && dishes[start - 1] && dishes[start - 1].section === s) ? s : null;
+};
+
+// Numerazione pagine: romana finché è leggibile, araba da 10 pagine in su
+// (con 54 pagine "XLII / LIV" è illeggibile).
+const folio = (n, total) => (total > 10 ? String(n) : romanize(n));
+
+// Liste con prezzo per voce (bar/listino): "coperti" e "portate" non hanno senso.
+const isPriceList = (menu) =>
+  (menu && menu.dishes || []).some(d => d.price !== null && d.price !== undefined);
+
 // Raggruppa i piatti per sezione consecutiva → [{ sec, start, items }].
 function sectionGroups(list){
   const groups = [];
@@ -217,6 +364,107 @@ function paginateDishes(dishes, cols, perPage, weight, sectionBreak){
   return pages.length ? pages : [{ start: 0, items: [] }];
 }
 
+// ============================================================
+// Impaginazione a MISURAZIONE REALE (solo in modalità Auto).
+// I pesi stimati sono solo il punto di partenza: qui misuriamo l'altezza
+// vera delle pagine renderizzate e spostiamo le voci finché ogni foglio è
+// pieno quanto può senza sbordare. Funziona anche con più colonne
+// (l'eccesso crea una colonna in più → lo vediamo da scrollWidth).
+// Le pagine sono rappresentate come indici di inizio: starts[i] = prima voce
+// della pagina i. Nessun limite al numero di pagine.
+// ============================================================
+// Firma degli input: se cambia, l'adattamento riparte da zero.
+const fitSig = (clientId, variant, cols, perPage, sectionBreak, dishes) =>
+  [clientId, variant, cols, perPage, sectionBreak ? 1 : 0, (dishes || []).length,
+   (dishes || []).map(d => (d.name || "").length + "." + (d.desc || "").length + "." +
+     (d.story || "").length + "." + (d.section || "")).join("|")].join("~");
+
+function useFittedPages(basePages, dishes, sectionBreak, enabled, sig, cols){
+  const rootRef = useRef(null);
+  const [starts, setStarts] = useState(() => basePages.map(p => p.start));
+  const phase = useRef(0);               // 0 = da misurare, 1+ = verifiche
+  const lastSig = useRef(sig);
+
+  if (lastSig.current !== sig){          // input cambiati → riparti pulito
+    lastSig.current = sig;
+    phase.current = 0;
+  }
+  useLayoutEffect(() => { phase.current = 0; setStarts(basePages.map(p => p.start)); }, [sig]);
+
+  useLayoutEffect(() => {
+    if (!enabled) return;
+    const root = rootRef.current;
+    if (!root) return;
+    const boxes = [...root.querySelectorAll("[data-fitbox]")];
+    const N = dishes.length;
+    if (!N || !boxes.length) return;
+
+    const secOf = (i) => (dishes[i] && dishes[i].section) || "";
+    const breaksAt = (i) => sectionBreak && i > 0 && secOf(i) !== secOf(i - 1);
+
+    // ---- FASE 0: misura una volta l'altezza vera di ogni voce e calcola
+    // l'impaginazione in un colpo solo (niente decine di ri-render).
+    if (phase.current === 0){
+      const cost = new Array(N).fill(0);
+      let seen = 0;
+      boxes.forEach(box => {
+        const gap = parseFloat(getComputedStyle(box).rowGap) || 0;
+        let pending = 0;                 // intestazioni di sezione: costo della voce che segue
+        box.querySelectorAll("[data-di],[data-fithead]").forEach(ch => {
+          const cs = getComputedStyle(ch);
+          const h = ch.getBoundingClientRect().height + gap +
+                    (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+          const a = ch.getAttribute("data-di");
+          if (a === null) pending += h;
+          else { cost[+a] = h + pending; pending = 0; seen++; }
+        });
+      });
+      if (seen < N) return;              // misura incompleta: riprova al prossimo giro
+
+      const A0 = boxes[0].clientHeight;                          // prima pagina
+      const A1 = boxes.length > 1 ? boxes[1].clientHeight : A0;  // pagine successive
+      const next = [0];
+      let acc = 0;
+      for (let i = 0; i < N; i++){
+        const avail = (next.length === 1 ? A0 : A1) * Math.max(1, cols || 1);
+        if (i > 0 && i !== next[next.length - 1] &&
+            (breaksAt(i) || acc + cost[i] > avail)){
+          next.push(i); acc = 0;
+        }
+        acc += cost[i];
+      }
+      phase.current = 1;
+      if (next.length !== starts.length || next.some((v, k) => v !== starts[k])) setStarts(next);
+      return;
+    }
+
+    // ---- FASE 1+: rete di sicurezza. Se per arrotondamenti una pagina
+    // sborda ancora (es. l'ultima con la legenda), sposta avanti l'eccesso.
+    if (phase.current > 8 || boxes.length !== starts.length) return;
+    const over = (b) => (b.scrollHeight > b.clientHeight + 1) || (b.scrollWidth > b.clientWidth + 1);
+    const endOf = (arr, i) => (i + 1 < arr.length ? arr[i + 1] : N);
+    const next = starts.slice();
+    let changed = false;
+    for (let i = 0; i < boxes.length; i++){
+      const from = next[i], to = endOf(next, i);
+      if (to - from > 1 && over(boxes[i])){
+        const moved = to - 1;
+        if (i + 1 < next.length && (!sectionBreak || secOf(moved) === secOf(next[i + 1]))) next[i + 1] = moved;
+        else next.splice(i + 1, 0, moved);
+        changed = true;
+        break;
+      }
+    }
+    if (changed){ phase.current += 1; setStarts(next); }
+  });
+
+  const pages = starts.map((s, i) => ({
+    start: s,
+    items: dishes.slice(s, i + 1 < starts.length ? starts[i + 1] : dishes.length)
+  }));
+  return [enabled ? pages : basePages, rootRef];
+}
+
 // ---- Utility ----
 const formatDate = (iso) => {
   if (!iso) return "";
@@ -241,7 +489,7 @@ const startsSection = (dishes, i) => {
 };
 // Intestazione di sezione (Antipasti, Buns, …) — stile per-variante via classe ms-<variante>
 const SectionHead = ({ title, variant }) => (
-  <div className={"menu-section ms-" + variant}>
+  <div className={"menu-section ms-" + variant} data-fithead>
     <span className="ms-rule" aria-hidden="true"></span>
     <span className="ms-label">{title}</span>
     <span className="ms-rule" aria-hidden="true"></span>
@@ -337,9 +585,11 @@ function MenuClassico({ menu, client }) {
   const portate = menu.dishes.length;
   const L = layoutOf(menu, "classico");
   const { cols, perPage, sectionBreak } = gridOf(menu, "classico");
-  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.classico, sectionBreak);
+  const base = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.classico, sectionBreak);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
+    fitSig(C.id, "classico", cols, perPage, sectionBreak, menu.dishes), cols);
   return (
-    <div className="sheet sheet-classico" data-client={C.id} data-screen-label="Menu Classico">
+    <div className="sheet sheet-classico" data-client={C.id} data-screen-label="Menu Classico" ref={fitRef}>
       <div className="page-A4 cover-page-c">
         {coast && <Citrus className="cover-citrus" />}
         <div className="cover-chef-c">{C.role} · {menu.chef}</div>
@@ -357,7 +607,8 @@ function MenuClassico({ menu, client }) {
             {menu.category && <span className="cover-cat-c">menu {menu.category}</span>}
           </div>
           <Draggable id="stats" offset={L.stats}><div className="cover-portate-c">
-            {courseNumber(portate-1)} portate <span className="dot-sep">·</span> {formatPrice(menu.price)}
+            {portate} {isPriceList(menu) ? "voci" : "portate"}
+            {menu.price ? <><span className="dot-sep">·</span> {formatPrice(menu.price)}</> : null}
           </div></Draggable>
           {menu.chefNote && (
             <p className="cover-note-c">{menu.chefNote}</p>
@@ -377,17 +628,19 @@ function MenuClassico({ menu, client }) {
             <div className="inner-wm-c"><Brand client={C} className="brand-sm" /></div>
             <div className="inner-menu-name-c">
               — {menu.name} —
-              {pages.length > 1 && <span className="inner-folio-c"> · {romanize(pi + 1)}/{romanize(pages.length)}</span>}
+              {pages.length > 1 && <span className="inner-folio-c"> · {folio(pi + 1, pages.length)}/{folio(pages.length, pages.length)}</span>}
             </div>
           </div>
 
-          <div className="dishes-c" style={colStyle(cols)}>
+          <div className="dishes-c" data-fitbox style={colStyle(cols)}>
+            {contSectionOf(menu.dishes, pg.start) &&
+              <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="c" />}
             {pg.items.map((d, idx) => {
               const i = pg.start + idx;
               return (
                 <React.Fragment key={i}>
                   {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="c" />}
-                  <div className="dish-c">
+                  <div className="dish-c" data-di={i}>
                     <div className="dish-num-c">{courseNumber(i)}</div>
                     <h3 className="dish-name-c">
                       {d.name || <span className="placeholder-c">Nome del piatto</span>}
@@ -436,9 +689,11 @@ function MenuContemporaneo({ menu, client }) {
   const portate = menu.dishes.length;
   const L = layoutOf(menu, "contemporaneo");
   const { cols, perPage, sectionBreak } = gridOf(menu, "contemporaneo");
-  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.contemporaneo, sectionBreak);
+  const base = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.contemporaneo, sectionBreak);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
+    fitSig(C.id, "contemporaneo", cols, perPage, sectionBreak, menu.dishes), cols);
   return (
-    <div className="sheet sheet-contemporaneo" data-client={C.id} data-screen-label="Menu Contemporaneo">
+    <div className="sheet sheet-contemporaneo" data-client={C.id} data-screen-label="Menu Contemporaneo" ref={fitRef}>
       <div className="page-A4 cover-page-m">
         {coast && <Citrus className="cover-citrus" />}
         <div className="cover-top-m">
@@ -453,17 +708,21 @@ function MenuContemporaneo({ menu, client }) {
           <div className="cover-rule-m"></div>
           <Draggable id="stats" offset={L.stats}><div className="cover-stats-m">
             <div className="stat-m">
-              <span className="stat-label-m">Portate</span>
-              <span className="stat-val-m">{courseNumber(portate - 1)}</span>
+              <span className="stat-label-m">{isPriceList(menu) ? "Voci" : "Portate"}</span>
+              <span className="stat-val-m">{portate}</span>
             </div>
-            <div className="stat-m">
-              <span className="stat-label-m">Prezzo</span>
-              <span className="stat-val-m">{formatPrice(menu.price)}</span>
-            </div>
-            <div className="stat-m">
-              <span className="stat-label-m">Coperti</span>
-              <span className="stat-val-m">{String(menu.seats).padStart(2,"0")}</span>
-            </div>
+            {menu.price ? (
+              <div className="stat-m">
+                <span className="stat-label-m">Prezzo</span>
+                <span className="stat-val-m">{formatPrice(menu.price)}</span>
+              </div>
+            ) : null}
+            {!isPriceList(menu) && (
+              <div className="stat-m">
+                <span className="stat-label-m">Coperti</span>
+                <span className="stat-val-m">{String(menu.seats).padStart(2,"0")}</span>
+              </div>
+            )}
           </div></Draggable>
           {menu.chefNote && (
             <p className="cover-note-m">«&nbsp;{menu.chefNote}&nbsp;»</p>
@@ -481,16 +740,18 @@ function MenuContemporaneo({ menu, client }) {
         <div className="page-A4 inner-page-m" key={pi}>
           <div className="inner-top-m">
             <span className="inner-wm-m"><Brand client={C} className="brand-sm" /></span>
-            <span className="inner-name-m">{menu.name} · {courseNumber(portate-1)} portate</span>
+            <span className="inner-name-m">{menu.name} · {portate} {isPriceList(menu) ? "voci" : "portate"}</span>
           </div>
 
-          <div className="dishes-m" style={colStyle(cols)}>
+          <div className="dishes-m" data-fitbox style={colStyle(cols)}>
+            {contSectionOf(menu.dishes, pg.start) &&
+              <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="m" />}
             {pg.items.map((d, idx) => {
               const i = pg.start + idx;
               return (
                 <React.Fragment key={i}>
                   {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="m" />}
-                  <div className="dish-m">
+                  <div className="dish-m" data-di={i}>
                     <div className="dish-left-m">
                       <div className="dish-num-m">{courseNumber(i)}</div>
                     </div>
@@ -512,7 +773,7 @@ function MenuContemporaneo({ menu, client }) {
             <div className="legend-m">
               {pi === pages.length - 1 && <AllergensLegend />}
             </div>
-            <div className="folio-m">{romanize(pi + 2)}</div>
+            <div className="folio-m">{folio(pi + 2, pages.length + 1)}</div>
           </div>
         </div>
       ))}
@@ -528,9 +789,11 @@ function MenuTabula({ menu, client }) {
   const coast = C.decor === "coast";
   const portate = menu.dishes.length;
   const { cols, perPage, sectionBreak } = gridOf(menu, "tabula");
-  const pages = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.tabula, sectionBreak);
+  const base = paginateDishes(menu.dishes, cols, perPage, WEIGHTS.tabula, sectionBreak);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
+    fitSig(C.id, "tabula", cols, perPage, sectionBreak, menu.dishes), cols);
   return (
-    <div className="sheet sheet-tabula" data-client={C.id} data-screen-label="Menu Tabula">
+    <div className="sheet sheet-tabula" data-client={C.id} data-screen-label="Menu Tabula" ref={fitRef}>
       {pages.map((pg, pi) => (
         <div className={"page-A4 tabula-page" + (pi === 0 ? "" : " tabula-page-cont")} key={pi}>
           <div className="tab-head">
@@ -547,27 +810,27 @@ function MenuTabula({ menu, client }) {
               <div className="tab-rule"></div>
               {coast && <CoastWave className="tab-wave" />}
               <div className="tab-stats">
-                <span>{courseNumber(portate-1)} portate</span>
-                <span className="dot-sep">·</span>
-                <span>{formatPrice(menu.price)}</span>
-                <span className="dot-sep">·</span>
-                <span>{menu.seats} posti</span>
+                <span>{portate} {isPriceList(menu) ? "voci" : "portate"}</span>
+                {menu.price ? <><span className="dot-sep">·</span><span>{formatPrice(menu.price)}</span></> : null}
+                {!isPriceList(menu) && <><span className="dot-sep">·</span><span>{menu.seats} posti</span></>}
               </div>
             </div>
           ) : (
             <div className="tab-title-cont">
               <span className="tab-name-cont">{menu.name || "—"}</span>
-              <span className="tab-folio-cont">{romanize(pi + 1)} / {romanize(pages.length)}</span>
+              <span className="tab-folio-cont">{folio(pi + 1, pages.length)} / {folio(pages.length, pages.length)}</span>
             </div>
           )}
 
-          <div className="tab-dishes" style={colStyle(cols)}>
+          <div className="tab-dishes" data-fitbox style={colStyle(cols)}>
+            {contSectionOf(menu.dishes, pg.start) &&
+              <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="t" />}
             {pg.items.map((d, idx) => {
               const i = pg.start + idx;
               return (
                 <React.Fragment key={i}>
                   {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="t" />}
-                  <div className="tab-dish">
+                  <div className="tab-dish" data-di={i}>
                     <h3 className="tab-dish-name">
                       {d.name || <span className="placeholder-m">Nome del piatto</span>}
                       <DishPrice value={d.price} />
@@ -623,9 +886,8 @@ function MenuEditoriale({ menu, client }) {
             <div className="ed-cat">— menu {menu.category} —</div>
             <h1 className="ed-name">{menu.name || "—"}</h1>
             <div className="ed-cover-stats">
-              <span>{courseNumber(portate-1)} portate</span>
-              <span className="dot-sep">·</span>
-              <span>{formatPrice(menu.price)}</span>
+              <span>{portate} {isPriceList(menu) ? "voci" : "portate"}</span>
+              {menu.price ? <><span className="dot-sep">·</span><span>{formatPrice(menu.price)}</span></> : null}
             </div>
             {menu.chefNote && <p className="ed-cover-note">«&nbsp;{menu.chefNote}&nbsp;»</p>}
           </div>
@@ -641,8 +903,8 @@ function MenuEditoriale({ menu, client }) {
         <div className="page-A4 ed-page" key={pIdx}>
           <div className="ed-page-head">
             <span className="ed-page-wm"><Brand client={C} className="brand-sm" /></span>
-            <span className="ed-page-name">{menu.name} · {courseNumber(portate-1)} portate</span>
-            <span className="ed-page-folio">{romanize(pIdx + 2)}</span>
+            <span className="ed-page-name">{menu.name} · {portate} {isPriceList(menu) ? "voci" : "portate"}</span>
+            <span className="ed-page-folio">{folio(pIdx + 2, pages.length + 1)}</span>
           </div>
 
           <div className="ed-page-body">
@@ -704,10 +966,12 @@ function MenuDiario({ menu, client }) {
   const portate = menu.dishes.length;
   // Voci per pagina configurabili (default 3). Le pagine si creano da sole.
   const { perPage, sectionBreak } = gridOf(menu, "diario");
-  const pages = paginateDishes(menu.dishes, 1, perPage, WEIGHTS.diario, sectionBreak);
+  const base = paginateDishes(menu.dishes, 1, perPage, WEIGHTS.diario, sectionBreak);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
+    fitSig(C.id, "diario", 1, perPage, sectionBreak, menu.dishes), 1);
 
   return (
-    <div className="sheet sheet-diario" data-client={C.id} data-screen-label="Menu Diario">
+    <div className="sheet sheet-diario" data-client={C.id} data-screen-label="Menu Diario" ref={fitRef}>
       {/* COVER */}
       <div className="page-A4 dr-cover">
         <div className="dr-top">
@@ -724,9 +988,9 @@ function MenuDiario({ menu, client }) {
           )}
           <div className="dr-rule"></div>
           <div className="dr-cover-stats">
-            <div className="dr-stat"><span className="dr-stat-lbl">portate</span><span className="dr-stat-val">{courseNumber(portate-1)}</span></div>
+            <div className="dr-stat"><span className="dr-stat-lbl">{isPriceList(menu) ? "voci" : "portate"}</span><span className="dr-stat-val">{portate}</span></div>
             <div className="dr-stat"><span className="dr-stat-lbl">prezzo</span><span className="dr-stat-val">{formatPrice(menu.price)}</span></div>
-            <div className="dr-stat"><span className="dr-stat-lbl">coperti</span><span className="dr-stat-val">{String(menu.seats).padStart(2,"0")}</span></div>
+            {!isPriceList(menu) && <div className="dr-stat"><span className="dr-stat-lbl">coperti</span><span className="dr-stat-val">{String(menu.seats).padStart(2,"0")}</span></div>}
           </div>
         </div>
 
@@ -740,17 +1004,19 @@ function MenuDiario({ menu, client }) {
         <div className="page-A4 dr-page" key={pIdx}>
           <div className="dr-page-head">
             <span className="dr-page-wm"><Brand client={C} className="brand-sm" /></span>
-            <span className="dr-page-meta">{menu.name} · {courseNumber(portate-1)} portate</span>
-            <span className="dr-page-folio">{romanize(pIdx + 2)}</span>
+            <span className="dr-page-meta">{menu.name} · {portate} {isPriceList(menu) ? "voci" : "portate"}</span>
+            <span className="dr-page-folio">{folio(pIdx + 2, pages.length + 1)}</span>
           </div>
 
-          <div className="dr-entries">
+          <div className="dr-entries" data-fitbox>
+            {contSectionOf(menu.dishes, group.start) &&
+              <SectionHead title={contSectionOf(menu.dishes, group.start) + " (segue)"} variant="dr" />}
             {group.items.map((d, idx) => {
               const i = group.start + idx;
               return (
                 <React.Fragment key={i}>
                 {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="dr" />}
-                <article className="dr-entry">
+                <article className="dr-entry" data-di={i}>
                   <div className="dr-entry-num">{courseNumber(i)}</div>
                   <div className="dr-entry-body">
                     <h3 className="dr-entry-name">
@@ -788,63 +1054,47 @@ function MenuListino({ menu, client }) {
   const coast = C.decor === "coast";
   const { cols, perPage, sectionBreak } = gridOf(menu, "listino");
 
-  // Raggruppa i piatti per sezione, mantenendo l'ordine
-  const groups = [];
-  (menu.dishes || []).forEach(d => {
-    const sec = d.section || "";
-    let g = groups[groups.length - 1];
-    if (!g || g.section !== sec) { g = { section: sec, items: [] }; groups.push(g); }
-    g.items.push(d);
-  });
+  // Impaginazione per indice (come le altre varianti) → in Auto le pagine
+  // vengono poi riempite fino al bordo dalla misurazione reale.
+  const LST_W = { perCol: 18, of: d => 1 + (((d.desc || "").length > 44) ? 0.6 : 0) };
+  const base = paginateDishes(menu.dishes, cols, perPage, LST_W, sectionBreak);
+  const [pages, fitRef] = useFittedPages(base, menu.dishes, sectionBreak, perPage === 0,
+    fitSig(C.id, "listino", cols, perPage, sectionBreak, menu.dishes), cols);
 
-  // Impacchetta le sezioni nelle pagine A4. Nessun tetto: le pagine crescono
-  // col contenuto. perPage>0 → tetto di voci per pagina; perPage 0 → auto per "peso".
-  // sectionBreak → ogni sezione parte da una pagina nuova (mai unite tra loro).
-  const wDish = d => 1 + (((d.desc || "").length > 44) ? 0.6 : 0);
-  const wGroup = g => (g.section ? 1 : 0) + g.items.reduce((s, d) => s + wDish(d), 0);
-  const pages = [];
-  if (sectionBreak){
-    groups.forEach(g => {
-      if (perPage > 0 && g.items.length > perPage){
-        for (let i = 0; i < g.items.length; i += perPage)
-          pages.push([{ section: g.section, items: g.items.slice(i, i + perPage) }]);
-      } else {
-        pages.push([g]);
-      }
+  // Le voci di una pagina, raggruppate per sezione ("(segue)" se la sezione
+  // arriva dalla pagina precedente).
+  const groupsFor = (pg) => {
+    const out = [];
+    pg.items.forEach((d, k) => {
+      const sec = d.section || "";
+      let g = out[out.length - 1];
+      if (!g || g.section !== sec){
+        out.push({ section: sec, items: [d], off: k, cont: k === 0 && !!contSectionOf(menu.dishes, pg.start) });
+      } else g.items.push(d);
     });
-  } else {
-    const budget = perPage > 0 ? perPage : cols * 20;
-    const measure = perPage > 0 ? (g => g.items.length) : wGroup;
-    let cur = [], curW = 0;
-    groups.forEach(g => {
-      const w = measure(g);
-      if (cur.length && curW + w > budget) { pages.push(cur); cur = []; curW = 0; }
-      cur.push(g); curW += w;
-    });
-    if (cur.length) pages.push(cur);
-  }
-  if (!pages.length) pages.push([]);
+    return out;
+  };
 
   return (
-    <div className="sheet sheet-listino" data-client={C.id} data-screen-label="Menu Listino">
-      {pages.map((pageGroups, pi) => (
+    <div className="sheet sheet-listino" data-client={C.id} data-screen-label="Menu Listino" ref={fitRef}>
+      {pages.map((pg, pi) => (
         <div className="page-A4 lst-page" key={pi}>
           <div className="lst-head">
             <span className="lst-wm"><Brand client={C} className="brand-sm" /></span>
             <span className="lst-meta">
               <span className="lst-title">{menu.name || "—"}</span>
-              {pages.length > 1 && <span className="lst-folio">{romanize(pi + 1)} / {romanize(pages.length)}</span>}
+              {pages.length > 1 && <span className="lst-folio">{folio(pi + 1, pages.length)} / {folio(pages.length, pages.length)}</span>}
             </span>
           </div>
 
           {pi === 0 && coast && <CoastWave className="lst-wave" />}
 
-          <div className="lst-body" style={{ columnCount: cols }}>
-            {pageGroups.map((g, gi) => (
+          <div className="lst-body" data-fitbox style={{ columnCount: cols }}>
+            {groupsFor(pg).map((g, gi) => (
               <section className="lst-group" key={gi}>
-                {g.section && <div className="lst-sec">{g.section}</div>}
+                {g.section && <div className="lst-sec" data-fithead>{g.section}{g.cont ? " (segue)" : ""}</div>}
                 {g.items.map((d, di) => (
-                  <div className="lst-item" key={di}>
+                  <div className="lst-item" key={di} data-di={pg.start + g.off + di}>
                     <div className="lst-item-head">
                       <span className="lst-item-name">
                         {d.name || "—"}
@@ -886,5 +1136,6 @@ Object.assign(window, {
   MenuClassico, MenuContemporaneo, MenuTabula, MenuEditoriale, MenuDiario, MenuListino,
   Brand, DishPrice, CoastWave, Citrus, Draggable, DragCtx,
   formatDate, formatPrice, ALLERGENI,
-  GRID_DEFAULTS, gridOf, paginateDishes, WEIGHTS, colStyle, sectionGroups
+  GRID_DEFAULTS, gridOf, paginateDishes, WEIGHTS, colStyle, sectionGroups,
+  FREE_BLOCKS, tagFreeBlocks, applyFreeLayout, installFreeDrag
 });

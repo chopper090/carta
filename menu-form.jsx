@@ -45,15 +45,15 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
   };
   const variantName = (VARIANTS.find(v => v.id === variant) || {}).name || "";
 
-  const updateDish = (i, field, value) => {
+  const updateDish = React.useCallback((i, field, value) => {
     setMenu(prev => {
       const dishes = [...prev.dishes];
       dishes[i] = { ...dishes[i], [field]: value };
       return { ...prev, dishes };
     });
-  };
+  }, [setMenu]);
 
-  const toggleAllergen = (i, n) => {
+  const toggleAllergen = React.useCallback((i, n) => {
     setMenu(prev => {
       const dishes = [...prev.dishes];
       const current = dishes[i].allergens || [];
@@ -63,7 +63,7 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
       dishes[i] = { ...dishes[i], allergens: next };
       return { ...prev, dishes };
     });
-  };
+  }, [setMenu]);
 
   const addDish = () => {
     setMenu(prev => ({
@@ -72,14 +72,14 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
     }));
   };
 
-  const removeDish = (i) => {
+  const removeDish = React.useCallback((i) => {
     setMenu(prev => ({
       ...prev,
       dishes: prev.dishes.filter((_, idx) => idx !== i)
     }));
-  };
+  }, [setMenu]);
 
-  const moveDish = (i, dir) => {
+  const moveDish = React.useCallback((i, dir) => {
     setMenu(prev => {
       const dishes = [...prev.dishes];
       const j = i + dir;
@@ -87,7 +87,7 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
       [dishes[i], dishes[j]] = [dishes[j], dishes[i]];
       return { ...prev, dishes };
     });
-  };
+  }, [setMenu]);
 
   // Gruppi di sezioni consecutive (unità per lo spostamento in blocco)
   const groupsOf = (dishes) => {
@@ -115,7 +115,7 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
     });
   };
 
-  const handleImageUpload = (i, file) => {
+  const handleImageUpload = React.useCallback((i, file) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -136,9 +136,9 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
-  };
+  }, [updateDish]);
 
-  const removeImage = (i) => updateDish(i, "image", null);
+  const removeImage = React.useCallback((i) => updateDish(i, "image", null), [updateDish]);
 
   const isNarrative = NARRATIVE_VARIANTS.has(variant);
   const isImage = IMAGE_VARIANTS.has(variant);
@@ -365,12 +365,12 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
                   total={menu.dishes.length}
                   isNarrative={isNarrative}
                   isImage={isImage}
-                  onChange={(field, value) => updateDish(i, field, value)}
-                  onToggleAllergen={(n) => toggleAllergen(i, n)}
-                  onMove={(dir) => moveDish(i, dir)}
-                  onRemove={() => removeDish(i)}
-                  onImageUpload={(f) => handleImageUpload(i, f)}
-                  onImageRemove={() => removeImage(i)}
+                  onChange={updateDish}
+                  onToggleAllergen={toggleAllergen}
+                  onMove={moveDish}
+                  onRemove={removeDish}
+                  onImageUpload={handleImageUpload}
+                  onImageRemove={removeImage}
                 />
               ))}
             </React.Fragment>
@@ -407,13 +407,13 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
 // ============================================================
 // DishEditor — sub-component per ogni piatto
 // ============================================================
-function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAllergen, onMove, onRemove, onImageUpload, onImageRemove }){
+const DishEditor = React.memo(function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAllergen, onMove, onRemove, onImageUpload, onImageRemove }){
   const fileRef = useRef(null);
 
   const openPicker = () => fileRef.current?.click();
   const onFileChange = (e) => {
     const file = e.target.files?.[0];
-    onImageUpload(file);
+    onImageUpload(i, file);
     e.target.value = ""; // reset so same file can be re-picked
   };
 
@@ -422,9 +422,9 @@ function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAl
       <div className="dish-row-head">
         <div className="dish-row-num">{String(i+1).padStart(2, "0")}</div>
         <div className="dish-row-controls">
-          <button className="ctrl-btn" disabled={i === 0} onClick={() => onMove(-1)} title="Sposta su" aria-label="Sposta la portata su">↑</button>
-          <button className="ctrl-btn" disabled={i === total - 1} onClick={() => onMove(1)} title="Sposta giù" aria-label="Sposta la portata giù">↓</button>
-          <button className="ctrl-btn ctrl-x" disabled={total <= 1} onClick={onRemove} title="Rimuovi portata" aria-label="Rimuovi la portata">×</button>
+          <button className="ctrl-btn" disabled={i === 0} onClick={() => onMove(i, -1)} title="Sposta su" aria-label="Sposta la portata su">↑</button>
+          <button className="ctrl-btn" disabled={i === total - 1} onClick={() => onMove(i, 1)} title="Sposta giù" aria-label="Sposta la portata giù">↓</button>
+          <button className="ctrl-btn ctrl-x" disabled={total <= 1} onClick={() => onRemove(i)} title="Rimuovi portata" aria-label="Rimuovi la portata">×</button>
         </div>
       </div>
 
@@ -437,7 +437,7 @@ function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAl
           type="text"
           list="sezioni-list"
           value={dish.section || ""}
-          onChange={e => onChange("section", e.target.value)}
+          onChange={e => onChange(i, "section", e.target.value)}
           placeholder="Antipasti, Buns, Piatti…" />
       </label>
 
@@ -446,7 +446,7 @@ function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAl
         <input
           type="text"
           value={dish.name}
-          onChange={e => onChange("name", e.target.value)}
+          onChange={e => onChange(i, "name", e.target.value)}
           placeholder="Tartare di tonno rosso…" />
       </label>
 
@@ -459,7 +459,7 @@ function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAl
           type="number"
           step="0.5"
           value={dish.price ?? ""}
-          onChange={e => onChange("price", e.target.value === "" ? null : Number(e.target.value))}
+          onChange={e => onChange(i, "price", e.target.value === "" ? null : Number(e.target.value))}
           placeholder="—" />
       </label>
 
@@ -468,7 +468,7 @@ function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAl
         <textarea
           value={dish.desc}
           rows="2"
-          onChange={e => onChange("desc", e.target.value)}
+          onChange={e => onChange(i, "desc", e.target.value)}
           placeholder="capperi di Pantelleria, olio Tonda Iblea…" />
       </label>
 
@@ -480,7 +480,7 @@ function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAl
         <textarea
           value={dish.story}
           rows="3"
-          onChange={e => onChange("story", e.target.value)}
+          onChange={e => onChange(i, "story", e.target.value)}
           placeholder="Una breve storia del piatto: origine, gesti, ricordo…" />
       </label>
 
@@ -495,7 +495,7 @@ function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAl
               <img src={dish.image} alt="" />
               <div className="image-actions">
                 <button className="mini-btn" onClick={openPicker}>Sostituisci</button>
-                <button className="mini-btn mini-x" onClick={onImageRemove}>Rimuovi</button>
+                <button className="mini-btn mini-x" onClick={() => onImageRemove(i)}>Rimuovi</button>
               </div>
             </div>
           ) : (
@@ -523,7 +523,7 @@ function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAl
               type="button"
               title={a.label}
               className={"allergen-chip " + (dish.allergens.includes(a.n) ? "on" : "")}
-              onClick={() => onToggleAllergen(a.n)}>
+              onClick={() => onToggleAllergen(i, a.n)}>
               {a.n}
             </button>
           ))}
@@ -531,6 +531,6 @@ function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAl
       </div>
     </div>
   );
-}
+});
 
 Object.assign(window, { Form, VARIANTS, NARRATIVE_VARIANTS, IMAGE_VARIANTS });
