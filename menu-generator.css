@@ -2379,8 +2379,9 @@ body{
   display: flex; align-items: center; gap: 10px; width: 100%;
   margin: 0 0 7mm; padding: 0;
 }
-.area-band-rule{
-  flex: 1 1 auto; height: 3px; border-radius: 2px; background: var(--sep-orange, #F2972E);
+.area-band-wave{
+  flex: 1 1 auto; min-width: 20px; height: 12px; display: block;
+  color: var(--sep-orange, #F2972E);
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
 }
 .area-band-name{
