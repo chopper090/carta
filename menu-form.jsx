@@ -134,7 +134,7 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
     setMenu(prev => {
       const meta = { ...(prev.areaMeta || {}) };
       const cur = { ...(meta[name || ""] || {}), ...patch };
-      if (!cur.cols && (cur.perPage === undefined || cur.perPage === null)) delete meta[name || ""];
+      if (!cur.cols && !cur.samePage && (cur.perPage === undefined || cur.perPage === null)) delete meta[name || ""];
       else meta[name || ""] = cur;
       return { ...prev, areaMeta: meta };
     });
@@ -604,6 +604,15 @@ function AreaRow({ area, index, total, meta, maxCols, onRename, onMeta, onMove }
               ))}
             </span>
           </span>
+        )}
+        {index > 0 && (
+          <button type="button"
+            className={"area-samepage " + (meta.samePage ? "on" : "")}
+            onClick={() => onMeta({ samePage: !meta.samePage })}
+            aria-pressed={!!meta.samePage}
+            title="Continua sul foglio della macroarea precedente invece di aprirne uno nuovo">
+            {meta.samePage ? "↳ stessa pagina" : "⤓ pagina nuova"}
+          </button>
         )}
         <span className="area-mini">
           <em>voci/pagina</em>

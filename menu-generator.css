@@ -2389,6 +2389,13 @@ body{
   letter-spacing: .22em; text-transform: uppercase; color: var(--sep-orange, #F2972E);
   white-space: nowrap;
 }
+/* banda a metà pagina: attraversa tutte le colonne */
+.area-band-inline{
+  column-span: all; -webkit-column-span: all;
+  margin: 6mm 0 5mm; break-after: avoid; page-break-after: avoid;
+}
+.lst-body .area-band-inline{ margin: 4mm 0 3mm; }
+
 /* la banda è una riga in più nella griglia della pagina */
 .inner-page-c:has(> .area-band),
 .inner-page-m:has(> .area-band),
@@ -2520,6 +2527,14 @@ body{
 .area-cols button:hover, .area-pp button:hover{ border-color: var(--sep-orange, #F2972E); }
 .area-cols button.on{ background: var(--sep-orange, #F2972E); color: #fff; border-color: var(--sep-orange, #F2972E); }
 .area-pp b{ font-family: var(--f-mono); font-size: 10.5px; font-weight: 400; min-width: 30px; text-align: center; color: var(--ink); }
+
+.area-samepage{
+  padding: 3px 9px; border: 1px solid var(--line-soft); background: var(--cream);
+  color: var(--warm-grey); border-radius: 5px; cursor: pointer;
+  font-family: var(--f-mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+}
+.area-samepage:hover{ border-color: var(--sep-orange, #F2972E); color: var(--ink); }
+.area-samepage.on{ background: var(--sep-orange, #F2972E); color: #fff; border-color: var(--sep-orange, #F2972E); }
 
 /* selettore macroarea sulla riga di sezione */
 .sec-area-pick{ display: flex; align-items: center; gap: 6px; margin: 0 0 8px 10px; }

@@ -331,6 +331,7 @@ const areaSettings = (menu, variant, area) => {
   return {
     cols: Math.max(1, Math.min(maxc, a.cols || g.cols)),
     perPage: (a.perPage === 0 || a.perPage) ? Math.max(0, a.perPage) : g.perPage,
+    samePage: !!a.samePage,          // continua sul foglio della macroarea precedente
     sectionBreak: g.sectionBreak
   };
 };
@@ -530,8 +531,8 @@ const WaveRule = () => (
 );
 
 // Separatore ondulato a tutta pagina che apre una macroarea (col suo nome).
-const AreaBand = ({ name }) => (
-  <div className="area-band">
+const AreaBand = ({ name, inline }) => (
+  <div className={"area-band" + (inline ? " area-band-inline" : "")} data-fithead>
     <WaveRule />
     {name ? <span className="area-band-name">{name}</span> : null}
     {name ? <WaveRule /> : null}
@@ -637,7 +638,8 @@ function MenuClassico({ menu, client }) {
   const AS = (i) => areaSettings(menu, "classico", areaOf(menu.dishes[i]));
   const colsAt = (i) => AS(i).cols;
   const perPageAt = (i) => AS(i).perPage;
-  const breakAt = (i) => areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) ||
+  const breakAt = (i) =>
+    (areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && !AS(i).samePage) ||
     (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
   const base = paginateDishes(menu.dishes, colsAt, perPageAt, WEIGHTS.classico, breakAt);
   const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
@@ -694,6 +696,8 @@ function MenuClassico({ menu, client }) {
               const i = pg.start + idx;
               return (
                 <React.Fragment key={i}>
+                  {idx > 0 && areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && areaOf(menu.dishes[i]) &&
+                    <AreaBand name={areaOf(menu.dishes[i])} inline />}
                   {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="c" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                   <div className="dish-c" data-di={i}>
                     <div className="dish-num-c">{courseNumber(i)}</div>
@@ -749,7 +753,8 @@ function MenuContemporaneo({ menu, client }) {
   const AS = (i) => areaSettings(menu, "contemporaneo", areaOf(menu.dishes[i]));
   const colsAt = (i) => AS(i).cols;
   const perPageAt = (i) => AS(i).perPage;
-  const breakAt = (i) => areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) ||
+  const breakAt = (i) =>
+    (areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && !AS(i).samePage) ||
     (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
   const base = paginateDishes(menu.dishes, colsAt, perPageAt, WEIGHTS.contemporaneo, breakAt);
   const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
@@ -813,6 +818,8 @@ function MenuContemporaneo({ menu, client }) {
               const i = pg.start + idx;
               return (
                 <React.Fragment key={i}>
+                  {idx > 0 && areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && areaOf(menu.dishes[i]) &&
+                    <AreaBand name={areaOf(menu.dishes[i])} inline />}
                   {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="m" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                   <div className="dish-m" data-di={i}>
                     <div className="dish-left-m">
@@ -857,7 +864,8 @@ function MenuTabula({ menu, client }) {
   const AS = (i) => areaSettings(menu, "tabula", areaOf(menu.dishes[i]));
   const colsAt = (i) => AS(i).cols;
   const perPageAt = (i) => AS(i).perPage;
-  const breakAt = (i) => areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) ||
+  const breakAt = (i) =>
+    (areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && !AS(i).samePage) ||
     (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
   const base = paginateDishes(menu.dishes, colsAt, perPageAt, WEIGHTS.tabula, breakAt);
   const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
@@ -900,6 +908,8 @@ function MenuTabula({ menu, client }) {
               const i = pg.start + idx;
               return (
                 <React.Fragment key={i}>
+                  {idx > 0 && areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && areaOf(menu.dishes[i]) &&
+                    <AreaBand name={areaOf(menu.dishes[i])} inline />}
                   {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="t" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                   <div className="tab-dish" data-di={i}>
                     <h3 className="tab-dish-name">
@@ -935,7 +945,8 @@ function MenuEditoriale({ menu, client }) {
   // Voci per pagina configurabili (default 2). Le pagine si creano da sole.
   const { perPage, sectionBreak } = gridOf(menu, "editoriale");
   const AS = (i) => areaSettings(menu, "editoriale", areaOf(menu.dishes[i]));
-  const breakAt = (i) => areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) ||
+  const breakAt = (i) =>
+    (areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && !AS(i).samePage) ||
     (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
   const pages = paginateDishes(menu.dishes, () => 1, (i) => AS(i).perPage, WEIGHTS.editoriale, breakAt);
 
@@ -988,7 +999,9 @@ function MenuEditoriale({ menu, client }) {
               const i = group.start + idx;
               return (
                 <React.Fragment key={i}>
-                {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="ed" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
+                {idx > 0 && areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && areaOf(menu.dishes[i]) &&
+                    <AreaBand name={areaOf(menu.dishes[i])} inline />}
+                  {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="ed" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                 <article className="ed-dish">
                   <DishImage
                     src={d.image}
@@ -1047,7 +1060,8 @@ function MenuDiario({ menu, client }) {
   const AS = (i) => areaSettings(menu, "diario", areaOf(menu.dishes[i]));
   const colsAt = (i) => 1;
   const perPageAt = (i) => AS(i).perPage;
-  const breakAt = (i) => areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) ||
+  const breakAt = (i) =>
+    (areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && !AS(i).samePage) ||
     (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
   const base = paginateDishes(menu.dishes, colsAt, perPageAt, WEIGHTS.diario, breakAt);
   const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
@@ -1099,7 +1113,9 @@ function MenuDiario({ menu, client }) {
               const i = group.start + idx;
               return (
                 <React.Fragment key={i}>
-                {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="dr" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
+                {idx > 0 && areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && areaOf(menu.dishes[i]) &&
+                    <AreaBand name={areaOf(menu.dishes[i])} inline />}
+                  {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="dr" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                 <article className="dr-entry" data-di={i}>
                   <div className="dr-entry-num">{courseNumber(i)}</div>
                   <div className="dr-entry-body">
@@ -1146,7 +1162,8 @@ function MenuListino({ menu, client }) {
   const AS = (i) => areaSettings(menu, "listino", areaOf(menu.dishes[i]));
   const colsAt = (i) => AS(i).cols;
   const perPageAt = (i) => AS(i).perPage;
-  const breakAt = (i) => areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) ||
+  const breakAt = (i) =>
+    (areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && !AS(i).samePage) ||
     (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
   const base = paginateDishes(menu.dishes, colsAt, perPageAt, LST_W, breakAt);
   const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
@@ -1160,7 +1177,10 @@ function MenuListino({ menu, client }) {
       const sec = d.section || "";
       let g = out[out.length - 1];
       if (!g || g.section !== sec){
-        out.push({ section: sec, items: [d], off: k, cont: k === 0 && !!contSectionOf(menu.dishes, pg.start) });
+        const gi0 = pg.start + k;
+        out.push({ section: sec, items: [d], off: k,
+          areaStart: k > 0 && areaOf(menu.dishes[gi0]) !== areaOf(menu.dishes[gi0 - 1]) ? areaOf(menu.dishes[gi0]) : null,
+          cont: k === 0 && !!contSectionOf(menu.dishes, pg.start) });
       } else g.items.push(d);
     });
     return out;
@@ -1181,7 +1201,9 @@ function MenuListino({ menu, client }) {
           {opensArea(menu.dishes, pg.start) && areaOf(menu.dishes[pg.start]) && <AreaBand name={areaOf(menu.dishes[pg.start])} />}
           <div className="lst-body" data-fitbox style={{ columnCount: colsAt(pg.start) }}>
             {groupsFor(pg).map((g, gi) => (
-              <section className="lst-group" key={gi}>
+              <React.Fragment key={gi}>
+              {g.areaStart && <AreaBand name={g.areaStart} inline />}
+              <section className="lst-group">
                 {g.section && (
                   <div className={"lst-sec" + (secMeta(menu, g.section).takeaway ? " lst-sec-takeaway" : "")} data-fithead>
                     {secMeta(menu, g.section).divider && !g.cont && <span className="ms-divider" aria-hidden="true"></span>}
@@ -1204,6 +1226,7 @@ function MenuListino({ menu, client }) {
                   </div>
                 ))}
               </section>
+              </React.Fragment>
             ))}
           </div>
 

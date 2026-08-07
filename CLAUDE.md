@@ -38,7 +38,9 @@ indipendente in `menu.areaMeta[nome] = { cols, perPage }` (`areaSettings` fa il
 merge con le impostazioni della variante). Il motore impagina "per indice":
 `paginateDishes(dishes, colsAt, perPageAt, weight, breakAt)` e
 `useFittedPages(base, dishes, breakAt, enabled, sig, colsAt)`. La banda è un
-blocco `FREE_BLOCKS` → si sposta e ridimensiona in modalità libera.
+blocco `FREE_BLOCKS` → si sposta e ridimensiona in modalità libera. Con
+`areaMeta[nome].samePage` la macroarea resta sul foglio della precedente: la
+banda diventa `.area-band-inline` (`column-span: all`) e taglia le colonne.
 
 **Sezioni.** `menu.sectionMeta[nome] = { divider, takeaway }` — separatore arancione
 prima della sezione e marchio "asporto". Sul piatto: `takeaway: true` mostra
