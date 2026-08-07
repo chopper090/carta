@@ -124,6 +124,137 @@ function Draggable({ id, offset, children }){
 const layoutOf = (menu, variant) => (menu && menu.layout && menu.layout[variant]) || {};
 
 // ============================================================
+// MODALITÀ LIBERA ("Canva") — ogni blocco della pagina si sposta,
+// si ingrandisce e si nasconde. Riusa lo stesso magazzino delle
+// posizioni di copertina: menu.layout[variante][id] = {x,y,s,h}.
+// Gli stili sono inline, quindi valgono anche in stampa/PDF/export.
+// ============================================================
+const FREE_BLOCKS = [
+  // blocchi di copertina
+  ".cover-center-c", ".cover-chef-c", ".cover-footer-c",
+  ".cover-top-m", ".cover-body-m", ".cover-foot-m",
+  ".tab-head", ".tab-title", ".tab-foot",
+  ".ed-cover-top", ".ed-cover-body", ".ed-cover-foot",
+  ".dr-top", ".dr-cover-body", ".dr-cover-foot",
+  // blocchi delle pagine interne
+  ".inner-head-c", ".dishes-c", ".inner-footer-c",
+  ".inner-top-m", ".dishes-m", ".inner-foot-m",
+  ".tab-title-cont", ".tab-dishes",
+  ".ed-page-head", ".ed-page-body", ".ed-page-foot",
+  ".dr-page-head", ".dr-entries", ".dr-page-foot",
+  ".lst-head", ".lst-body", ".lst-foot",
+  // singoli elementi
+  ".menu-section", ".dish-c", ".dish-m", ".tab-dish",
+  ".ed-dish", ".dr-entry", ".lst-group", ".lst-item"
+];
+
+const freeKey = (sel) => sel.replace(/[^a-z0-9-]/gi, "");
+
+// Assegna a ogni blocco un id stabile (pagina + tipo + progressivo).
+function tagFreeBlocks(root){
+  root.querySelectorAll("[data-free-id]").forEach(el => el.removeAttribute("data-free-id"));
+  [...root.querySelectorAll(".page-A4")].forEach((pg, pi) => {
+    const n = {};
+    FREE_BLOCKS.forEach(sel => {
+      const k = freeKey(sel);
+      pg.querySelectorAll(sel).forEach(el => {
+        if (el.hasAttribute("data-drag-id")) return;   // già gestito dalla copertina
+        n[k] = n[k] || 0;
+        el.setAttribute("data-free-id", pi + ":" + k + ":" + (n[k]++));
+      });
+    });
+  });
+}
+
+// Applica posizione / dimensione / visibilità salvate.
+function applyFreeLayout(root, layout){
+  root.querySelectorAll("[data-free-id]").forEach(el => {
+    const v = layout[el.getAttribute("data-free-id")];
+    el.style.transform = (v && (v.x || v.y)) ? `translate(${v.x}px, ${v.y}px)` : "";
+    el.style.fontSize   = (v && v.s && v.s !== 1) ? (v.s * 100) + "%" : "";
+    el.style.opacity    = (v && v.h) ? "0" : "";
+    el.style.pointerEvents = (v && v.h) ? "none" : "";
+  });
+}
+
+// Trascinamento con guide di allineamento e snap (stesso comportamento
+// della copertina, ma su qualunque blocco).
+function installFreeDrag(root, { zoom, layout, onCommit, onSelect, selectedId }){
+  const TH = 6;
+  const onDown = (e) => {
+    const el = e.target.closest("[data-free-id]");
+    if (!el || !root.contains(el)) return;
+    if (e.button != null && e.button !== 0) return;
+    const page = el.closest(".page-A4");
+    if (!page) return;
+    e.preventDefault(); e.stopPropagation();
+
+    const id = el.getAttribute("data-free-id");
+    onSelect(id);
+    const cur0 = layout[id] || {};
+    const base = { x: cur0.x || 0, y: cur0.y || 0 };
+    const start = { x: e.clientX, y: e.clientY };
+    const z = (zoom && zoom > 0) ? zoom : 1;
+    const pr = page.getBoundingClientRect();
+    const vx = [pr.left, pr.left + pr.width / 2, pr.right];
+    const hy = [pr.top, pr.top + pr.height / 2, pr.bottom];
+    page.querySelectorAll("[data-free-id]").forEach(d => {
+      if (d === el || el.contains(d) || d.contains(el)) return;
+      const r = d.getBoundingClientRect();
+      vx.push(r.left, r.left + r.width / 2, r.right);
+      hy.push(r.top, r.top + r.height / 2, r.bottom);
+    });
+    const layer = document.getElementById("dragGuideLayer");
+    const clear = () => { if (layer) layer.innerHTML = ""; };
+    const guide = (o, pos) => {
+      if (!layer) return;
+      const l = document.createElement("div");
+      l.className = "drag-guide " + o;
+      if (o === "v"){ l.style.left = pos + "px"; l.style.top = pr.top + "px"; l.style.height = pr.height + "px"; }
+      else { l.style.top = pos + "px"; l.style.left = pr.left + "px"; l.style.width = pr.width + "px"; }
+      layer.appendChild(l);
+    };
+
+    el.classList.add("dragging");
+    let cur = { ...base }, moved = false;
+
+    const onMove = (ev) => {
+      let nx = base.x + (ev.clientX - start.x) / z;
+      let ny = base.y + (ev.clientY - start.y) / z;
+      if (Math.abs(ev.clientX - start.x) + Math.abs(ev.clientY - start.y) > 3) moved = true;
+      el.style.transform = `translate(${nx}px, ${ny}px)`;
+      const r = el.getBoundingClientRect();
+      clear();
+      let bx = null;
+      vx.forEach(L => [r.left, r.left + r.width / 2, r.right].forEach(pt => {
+        const d = L - pt;
+        if (Math.abs(d) <= TH && (bx === null || Math.abs(d) < Math.abs(bx.d))) bx = { d, L };
+      }));
+      if (bx){ nx += bx.d / z; guide("v", bx.L); }
+      let by = null;
+      hy.forEach(L => [r.top, r.top + r.height / 2, r.bottom].forEach(pt => {
+        const d = L - pt;
+        if (Math.abs(d) <= TH && (by === null || Math.abs(d) < Math.abs(by.d))) by = { d, L };
+      }));
+      if (by){ ny += by.d / z; guide("h", by.L); }
+      el.style.transform = `translate(${nx}px, ${ny}px)`;
+      cur = { x: Math.round(nx), y: Math.round(ny) };
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      el.classList.remove("dragging");
+      clear();
+      if (moved) onCommit(id, cur);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+  root.addEventListener("pointerdown", onDown);
+  return () => root.removeEventListener("pointerdown", onDown);
+}
+
+// ============================================================
 // Impaginazione per-variante — colonne + voci per pagina.
 // Le impostazioni vivono in menu.grid[variante] = { cols, perPage }.
 //   perPage === 0  → automatico: le pagine A4 si riempiono da sole in base
@@ -1005,5 +1136,6 @@ Object.assign(window, {
   MenuClassico, MenuContemporaneo, MenuTabula, MenuEditoriale, MenuDiario, MenuListino,
   Brand, DishPrice, CoastWave, Citrus, Draggable, DragCtx,
   formatDate, formatPrice, ALLERGENI,
-  GRID_DEFAULTS, gridOf, paginateDishes, WEIGHTS, colStyle, sectionGroups
+  GRID_DEFAULTS, gridOf, paginateDishes, WEIGHTS, colStyle, sectionGroups,
+  FREE_BLOCKS, tagFreeBlocks, applyFreeLayout, installFreeDrag
 });

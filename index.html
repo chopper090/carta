@@ -238,6 +238,58 @@ function App(){
     });
   }, [variant]);
   const dragValue = { editable: true, zoom, onCommit: setLayoutOffset };
+
+  // ---- MODALITÀ LIBERA: sposta/ingrandisci/nascondi qualunque blocco ----
+  const freeOn = !!((menu.grid || {})[variant] || {}).free;
+  const [freeSel, setFreeSel] = useState(null);
+  const layoutCur = (menu.layout && menu.layout[variant]) || {};
+
+  const updateFree = useCallback((id, patch) => {
+    setMenu(m => {
+      const layout = { ...(m.layout || {}) };
+      const cur = { ...(layout[variant] || {}) };
+      const v = { ...(cur[id] || {}), ...patch };
+      if (!v.x && !v.y && (!v.s || v.s === 1) && !v.h) delete cur[id]; else cur[id] = v;
+      layout[variant] = cur;
+      return { ...m, layout };
+    });
+  }, [variant]);
+
+  const toggleFree = () => setMenu(m => {
+    const g = { ...(m.grid || {}) };
+    g[variant] = { ...(g[variant] || {}), free: !freeOn };
+    return { ...m, grid: g };
+  });
+
+  // applica sempre il layout salvato; aggancia il trascinamento solo se attivo
+  useEffect(() => {
+    const pane = previewRef.current;
+    if (!pane || typeof tagFreeBlocks !== "function") return;
+    // niente modalità libera e nessuna posizione salvata → nulla da fare
+    if (!freeOn && !Object.keys(layoutCur).length) return;
+    tagFreeBlocks(pane);
+    applyFreeLayout(pane, layoutCur);
+    pane.classList.toggle("free-mode", freeOn);
+    if (!freeOn) return;
+    return installFreeDrag(pane, {
+      zoom, layout: layoutCur,
+      onCommit: (id, off) => updateFree(id, off),
+      onSelect: setFreeSel
+    });
+  });
+
+  // evidenzia l'elemento selezionato
+  useEffect(() => {
+    const pane = previewRef.current;
+    if (!pane) return;
+    pane.querySelectorAll(".free-selected").forEach(el => el.classList.remove("free-selected"));
+    if (freeOn && freeSel){
+      pane.querySelectorAll(`[data-free-id="${freeSel}"]`).forEach(el => el.classList.add("free-selected"));
+    }
+  });
+
+  const selVal = (freeSel && layoutCur[freeSel]) || {};
+  const stepSize = (d) => updateFree(freeSel, { s: Math.max(0.4, Math.min(3, (selVal.s || 1) + d)) });
   const hasLayout = !!(menu.layout && menu.layout[variant] && Object.keys(menu.layout[variant]).length);
   const resetLayout = () => {
     setMenu(m => {
@@ -317,6 +369,22 @@ function App(){
           </div>
 
           <div className="ptb-spacer"></div>
+
+          <button className={"ptb-theme ptb-free " + (freeOn ? "on" : "")} onClick={toggleFree}
+            title={freeOn ? "Esci dalla modalità libera" : "Modalità libera: sposta e ridimensiona gli elementi"}
+            aria-pressed={freeOn}>✥</button>
+
+          {freeOn && freeSel && (
+            <div className="ptb-freebar">
+              <button onClick={() => stepSize(-0.1)} title="Riduci il testo">A−</button>
+              <span className="ptb-freeval">{Math.round((selVal.s || 1) * 100)}%</span>
+              <button onClick={() => stepSize(+0.1)} title="Ingrandisci il testo">A+</button>
+              <button onClick={() => updateFree(freeSel, { h: !selVal.h })}
+                title={selVal.h ? "Mostra" : "Nascondi"}>{selVal.h ? "◯" : "◉"}</button>
+              <button onClick={() => { updateFree(freeSel, { x: 0, y: 0, s: 1, h: false }); }}
+                title="Reimposta questo elemento">⤺</button>
+            </div>
+          )}
 
           {saveErr && (
             <span className="ptb-warn" title="Spazio del browser esaurito: il menù non viene più salvato. Alleggerisci le foto o esporta in JSON.">

@@ -19,11 +19,21 @@ stateful interdipendenti: Form + 5 "sheet"). Zero build. PWA (sw + manifest + `.
 **Dove stanno i dati.** `localStorage`, **per-cliente**: `menu.<id>`, `variant.<id>`,
 `active.client`, `ui.theme`. Migrazione legacy dalla vecchia chiave `dalentini.menu`.
 
-**Impaginazione.** `menu.grid[variante] = { cols, perPage }` (in `menu-data.js`;
-`perPage:0` = auto). Colonne + voci-per-pagina scelte per singolo stile dal form.
-Il motore (`menu-sheets.jsx`) impagina da sé senza limiti: helper `gridOf`,
-`paginateDishes`, `WEIGHTS`, `GRID_DEFAULTS` (esposti su `window`). Le colonne
-valgono solo sugli stili a lista (classico/contemporaneo/tabula/listino).
+**Impaginazione.** `menu.grid[variante] = { cols, perPage, sectionBreak, free }`
+(`perPage:0` = auto; `sectionBreak` = ogni sezione parte da una pagina nuova).
+In Auto l'impaginazione è **a misurazione reale** (`useFittedPages`): misura
+l'altezza vera delle voci (`data-di` / `data-fithead`, contenitore `data-fitbox`)
+e calcola i salti pagina in un colpo solo — riempimento ~95%, nessun limite di
+pagine. `WEIGHTS`/`paginateDishes` restano solo come stima iniziale. Le colonne
+valgono sugli stili a lista (classico/contemporaneo/tabula/listino).
+
+**Modalità libera ("Canva").** `menu.layout[variante][id] = {x,y,s,h}` — sposta,
+ingrandisce e nasconde qualunque blocco (`FREE_BLOCKS`, `tagFreeBlocks`,
+`applyFreeLayout`, `installFreeDrag`). Stili inline → valgono anche in
+stampa/PDF/export. Si attiva col tasto ✥ nella barra dell'anteprima.
+
+**Export HTML.** È davvero standalone: CSS incorporato + pagine già renderizzate
+(nessun React/Babel, nessun file affiancato).
 
 **Come si edita.** Cliente nuovo → voce in `CLIENTS` + preset in `PRESET_MENUS` (+ eventuale
 blocco `[data-client]` nel CSS). Il motore (`menu-sheets/form`) non va toccato: legge tutto da
