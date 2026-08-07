@@ -22,6 +22,8 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
   const C = client || (typeof getClient === "function" ? getClient(DEFAULT_CLIENT) : null);
   const presets = (C && C.presets) || [];
   const sectionNames = [...new Set((menu.dishes || []).map(d => d.section).filter(Boolean))];
+  // stringa (non array) → le schede memoizzate non si ri-renderizzano inutilmente
+  const sectionsKey = sectionNames.join("\u0001");
 
   const updateField = (field, value) => {
     setMenu(prev => ({ ...prev, [field]: value }));
@@ -114,6 +116,54 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
       return { ...prev, dishes };
     });
   };
+
+  // Rinomina una sezione: aggiorna tutti i suoi piatti e sposta le impostazioni.
+  const renameSection = React.useCallback((oldName, newName) => {
+    const from = oldName || "", to = (newName || "").trim();
+    if (from === to) return;
+    setMenu(prev => {
+      const dishes = prev.dishes.map(d => ((d.section || "") === from ? { ...d, section: to } : d));
+      const meta = { ...(prev.sectionMeta || {}) };
+      if (meta[from]){ if (to) meta[to] = meta[from]; delete meta[from]; }
+      return { ...prev, dishes, sectionMeta: meta };
+    });
+  }, [setMenu]);
+
+  // Separatore arancione / sezione asporto
+  const toggleSectionFlag = React.useCallback((name, key) => {
+    setMenu(prev => {
+      const meta = { ...(prev.sectionMeta || {}) };
+      const cur = { ...(meta[name || ""] || {}) };
+      cur[key] = !cur[key];
+      if (!cur.divider && !cur.takeaway) delete meta[name || ""]; else meta[name || ""] = cur;
+      return { ...prev, sectionMeta: meta };
+    });
+  }, [setMenu]);
+
+  // Aggiunge una voce in fondo a QUESTA sezione (non in fondo al menù)
+  const addDishToSection = React.useCallback((name, lastIdx) => {
+    setMenu(prev => {
+      const dishes = [...prev.dishes];
+      dishes.splice(lastIdx + 1, 0,
+        { name: "", section: name || "", desc: "", story: "", image: null, price: null, takeaway: false, allergens: [] });
+      return { ...prev, dishes };
+    });
+  }, [setMenu]);
+
+  const duplicateDish = React.useCallback((i) => {
+    setMenu(prev => {
+      const dishes = [...prev.dishes];
+      dishes.splice(i + 1, 0, { ...dishes[i] });
+      return { ...prev, dishes };
+    });
+  }, [setMenu]);
+
+  // Nuova sezione vuota in fondo
+  const addSection = () => setMenu(prev => ({
+    ...prev,
+    dishes: [...prev.dishes,
+      { name: "", section: "Nuova sezione", desc: "", story: "", image: null, price: null, takeaway: false, allergens: [] }]
+  }));
 
   const handleImageUpload = React.useCallback((i, file) => {
     if (!file) return;
@@ -328,7 +378,10 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
       <div className="form-section">
         <div className="section-label-row">
           <div className="section-label">Portate · {menu.dishes.length}</div>
-          <button className="mini-btn" onClick={addDish}>+ aggiungi</button>
+          <span className="mini-btn-row">
+            <button className="mini-btn" onClick={addDish}>+ voce</button>
+            <button className="mini-btn" onClick={addSection}>+ sezione</button>
+          </span>
         </div>
 
         <div className="form-hint">
@@ -343,18 +396,25 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
         <div className="dishes-form">
           {sectionGroupsUI.map((g, gi) => (
             <React.Fragment key={gi}>
-              <div className="section-move-row">
-                <span className="section-move-name">
-                  {g.sec || <em className="section-move-none">senza sezione</em>}
-                  <span className="section-move-count">· {g.idxs.length}</span>
-                </span>
+              <div className={"section-move-row" + (((menu.sectionMeta || {})[g.sec] || {}).takeaway ? " sec-takeaway" : "")}>
+                {((menu.sectionMeta || {})[g.sec] || {}).divider && <span className="sec-divider-mark" aria-hidden="true"></span>}
+                <SectionNameInput value={g.sec} count={g.idxs.length} onCommit={(v) => renameSection(g.sec, v)} />
                 <div className="section-move-ctrls">
+                  <button type="button" className={"ctrl-btn ctrl-sep " + (((menu.sectionMeta || {})[g.sec] || {}).divider ? "on" : "")}
+                    onClick={() => toggleSectionFlag(g.sec, "divider")}
+                    title="Separatore arancione prima di questa sezione">▬</button>
+                  <button type="button" className={"ctrl-btn ctrl-take " + (((menu.sectionMeta || {})[g.sec] || {}).takeaway ? "on" : "")}
+                    onClick={() => toggleSectionFlag(g.sec, "takeaway")}
+                    title="Sezione da asporto">⛱</button>
                   <button type="button" className="ctrl-btn" disabled={gi === 0}
                     onClick={() => moveSection(gi, -1)}
                     title="Sposta la sezione su" aria-label="Sposta la sezione su">↑</button>
                   <button type="button" className="ctrl-btn" disabled={gi === sectionGroupsUI.length - 1}
                     onClick={() => moveSection(gi, 1)}
                     title="Sposta la sezione giù" aria-label="Sposta la sezione giù">↓</button>
+                  <button type="button" className="ctrl-btn ctrl-add"
+                    onClick={() => addDishToSection(g.sec, g.idxs[g.idxs.length - 1])}
+                    title="Aggiungi una voce in questa sezione">+</button>
                 </div>
               </div>
               {g.idxs.map(i => (
@@ -371,6 +431,8 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
                   onRemove={removeDish}
                   onImageUpload={handleImageUpload}
                   onImageRemove={removeImage}
+                  onDuplicate={duplicateDish}
+                  sectionsKey={sectionsKey}
                 />
               ))}
             </React.Fragment>
@@ -405,9 +467,33 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
 }
 
 // ============================================================
+// Nome della sezione — si conferma con Invio o uscendo dal campo,
+// così rinominare non spezza il raggruppamento a ogni lettera.
+// ============================================================
+function SectionNameInput({ value, count, onCommit }){
+  const [v, setV] = useState(value || "");
+  const [editing, setEditing] = useState(false);
+  useEffect(() => { if (!editing) setV(value || ""); }, [value, editing]);
+  return (
+    <span className="section-name-wrap">
+      <input
+        className="section-name-input"
+        value={v}
+        placeholder="senza sezione"
+        onFocus={() => setEditing(true)}
+        onChange={e => setV(e.target.value)}
+        onBlur={() => { setEditing(false); onCommit(v); }}
+        onKeyDown={e => { if (e.key === "Enter"){ e.target.blur(); } }}
+        title="Rinomina la sezione (vale per tutte le sue voci)" />
+      <span className="section-move-count">{count}</span>
+    </span>
+  );
+}
+
+// ============================================================
 // DishEditor — sub-component per ogni piatto
 // ============================================================
-const DishEditor = React.memo(function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAllergen, onMove, onRemove, onImageUpload, onImageRemove }){
+const DishEditor = React.memo(function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAllergen, onMove, onRemove, onImageUpload, onImageRemove, onDuplicate, sectionsKey }){
   const fileRef = useRef(null);
 
   const openPicker = () => fileRef.current?.click();
@@ -424,6 +510,7 @@ const DishEditor = React.memo(function DishEditor({ i, dish, total, isNarrative,
         <div className="dish-row-controls">
           <button className="ctrl-btn" disabled={i === 0} onClick={() => onMove(i, -1)} title="Sposta su" aria-label="Sposta la portata su">↑</button>
           <button className="ctrl-btn" disabled={i === total - 1} onClick={() => onMove(i, 1)} title="Sposta giù" aria-label="Sposta la portata giù">↓</button>
+          <button className="ctrl-btn" onClick={() => onDuplicate(i)} title="Duplica questa voce" aria-label="Duplica la voce">⧉</button>
           <button className="ctrl-btn ctrl-x" disabled={total <= 1} onClick={() => onRemove(i)} title="Rimuovi portata" aria-label="Rimuovi la portata">×</button>
         </div>
       </div>
@@ -431,14 +518,33 @@ const DishEditor = React.memo(function DishEditor({ i, dish, total, isNarrative,
       <label className="field">
         <span className="field-label">
           Sezione
-          <span className="field-flag">opzionale · es. Antipasti, Buns, Piatti</span>
+          <span className="field-flag">sposta la voce in un'altra sezione</span>
         </span>
-        <input
-          type="text"
-          list="sezioni-list"
-          value={dish.section || ""}
-          onChange={e => onChange(i, "section", e.target.value)}
-          placeholder="Antipasti, Buns, Piatti…" />
+        <select
+          className="section-select"
+          value={(sectionsKey || "").split("\u0001").filter(Boolean).includes(dish.section || "") ? dish.section : "__new__"}
+          onChange={e => {
+            if (e.target.value === "__new__"){
+              const n = prompt("Nome della nuova sezione:", dish.section || "");
+              if (n !== null) onChange(i, "section", n.trim());
+            } else onChange(i, "section", e.target.value);
+          }}>
+          {(sectionsKey || "").split("\u0001").filter(Boolean).map(sn =>
+            <option key={sn} value={sn}>{sn}</option>)}
+          <option value="">— senza sezione —</option>
+          <option value="__new__">+ nuova sezione…</option>
+        </select>
+      </label>
+
+      <label className="field field-takeaway">
+        <span className="field-label">Disponibile da asporto</span>
+        <button type="button"
+          className={"takeaway-toggle " + (dish.takeaway ? "on" : "")}
+          onClick={() => onChange(i, "takeaway", !dish.takeaway)}
+          aria-pressed={!!dish.takeaway}>
+          <span className="tt-check">{dish.takeaway ? "✓" : ""}</span>
+          <span>{dish.takeaway ? "Sì — mostra etichetta «asporto»" : "No"}</span>
+        </button>
       </label>
 
       <label className="field">

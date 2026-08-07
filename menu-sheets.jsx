@@ -488,13 +488,20 @@ const startsSection = (dishes, i) => {
   return !!s && (i === 0 || (dishes[i - 1] && dishes[i - 1].section) !== s);
 };
 // Intestazione di sezione (Antipasti, Buns, …) — stile per-variante via classe ms-<variante>
-const SectionHead = ({ title, variant }) => (
-  <div className={"menu-section ms-" + variant} data-fithead>
+const SectionHead = ({ title, variant, divider, takeaway }) => (
+  <div className={"menu-section ms-" + variant + (takeaway ? " ms-takeaway" : "")} data-fithead>
+    {divider && <span className="ms-divider" aria-hidden="true"></span>}
     <span className="ms-rule" aria-hidden="true"></span>
-    <span className="ms-label">{title}</span>
+    <span className="ms-label">{title}{takeaway && <em className="ms-tag">asporto</em>}</span>
     <span className="ms-rule" aria-hidden="true"></span>
   </div>
 );
+
+// Impostazioni per sezione: separatore arancione e sezione "asporto"
+const secMeta = (menu, name) => ((menu && menu.sectionMeta) || {})[name || ""] || {};
+
+// Etichetta "asporto" sulla singola voce
+const TakeawayTag = ({ on }) => on ? <span className="dish-takeaway">asporto</span> : null;
 
 // Cliente attivo, con fallback alla casa
 const useClient = (client) =>
@@ -634,18 +641,19 @@ function MenuClassico({ menu, client }) {
 
           <div className="dishes-c" data-fitbox style={colStyle(cols)}>
             {contSectionOf(menu.dishes, pg.start) &&
-              <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="c" />}
+              <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="c" takeaway={secMeta(menu, contSectionOf(menu.dishes, pg.start)).takeaway} />}
             {pg.items.map((d, idx) => {
               const i = pg.start + idx;
               return (
                 <React.Fragment key={i}>
-                  {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="c" />}
+                  {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="c" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                   <div className="dish-c" data-di={i}>
                     <div className="dish-num-c">{courseNumber(i)}</div>
                     <h3 className="dish-name-c">
                       {d.name || <span className="placeholder-c">Nome del piatto</span>}
                       <DishPrice value={d.price} />
                       <AllergensInline list={d.allergens} />
+                      <TakeawayTag on={d.takeaway} />
                     </h3>
                     {d.desc && <p className="dish-desc-c">{d.desc}</p>}
                     {idx < pg.items.length - 1 && !startsSection(menu.dishes, i + 1) && (
@@ -745,12 +753,12 @@ function MenuContemporaneo({ menu, client }) {
 
           <div className="dishes-m" data-fitbox style={colStyle(cols)}>
             {contSectionOf(menu.dishes, pg.start) &&
-              <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="m" />}
+              <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="m" takeaway={secMeta(menu, contSectionOf(menu.dishes, pg.start)).takeaway} />}
             {pg.items.map((d, idx) => {
               const i = pg.start + idx;
               return (
                 <React.Fragment key={i}>
-                  {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="m" />}
+                  {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="m" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                   <div className="dish-m" data-di={i}>
                     <div className="dish-left-m">
                       <div className="dish-num-m">{courseNumber(i)}</div>
@@ -760,6 +768,7 @@ function MenuContemporaneo({ menu, client }) {
                         {d.name || <span className="placeholder-m">Nome del piatto</span>}
                         <DishPrice value={d.price} />
                         <AllergensInline list={d.allergens} />
+                        <TakeawayTag on={d.takeaway} />
                       </h3>
                       {d.desc && <p className="dish-desc-m">{d.desc}</p>}
                     </div>
@@ -824,17 +833,18 @@ function MenuTabula({ menu, client }) {
 
           <div className="tab-dishes" data-fitbox style={colStyle(cols)}>
             {contSectionOf(menu.dishes, pg.start) &&
-              <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="t" />}
+              <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="t" takeaway={secMeta(menu, contSectionOf(menu.dishes, pg.start)).takeaway} />}
             {pg.items.map((d, idx) => {
               const i = pg.start + idx;
               return (
                 <React.Fragment key={i}>
-                  {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="t" />}
+                  {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="t" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                   <div className="tab-dish" data-di={i}>
                     <h3 className="tab-dish-name">
                       {d.name || <span className="placeholder-m">Nome del piatto</span>}
                       <DishPrice value={d.price} />
                       <AllergensInline list={d.allergens} />
+                      <TakeawayTag on={d.takeaway} />
                     </h3>
                     {d.desc && <div className="tab-dish-desc">{d.desc}</div>}
                     {idx < pg.items.length - 1 && !startsSection(menu.dishes, i + 1) && <div className="tab-sep"></div>}
@@ -912,7 +922,7 @@ function MenuEditoriale({ menu, client }) {
               const i = group.start + idx;
               return (
                 <React.Fragment key={i}>
-                {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="ed" />}
+                {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="ed" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                 <article className="ed-dish">
                   <DishImage
                     src={d.image}
@@ -925,6 +935,7 @@ function MenuEditoriale({ menu, client }) {
                     <h3 className="ed-dish-name">
                       {d.name || <span className="placeholder-m">Nome del piatto</span>}
                       <DishPrice value={d.price} />
+                      <TakeawayTag on={d.takeaway} />
                     </h3>
                     {d.desc && <p className="ed-dish-desc">{d.desc}</p>}
                     {d.story && (
@@ -1010,12 +1021,12 @@ function MenuDiario({ menu, client }) {
 
           <div className="dr-entries" data-fitbox>
             {contSectionOf(menu.dishes, group.start) &&
-              <SectionHead title={contSectionOf(menu.dishes, group.start) + " (segue)"} variant="dr" />}
+              <SectionHead title={contSectionOf(menu.dishes, group.start) + " (segue)"} variant="dr" takeaway={secMeta(menu, contSectionOf(menu.dishes, group.start)).takeaway} />}
             {group.items.map((d, idx) => {
               const i = group.start + idx;
               return (
                 <React.Fragment key={i}>
-                {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="dr" />}
+                {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="dr" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                 <article className="dr-entry" data-di={i}>
                   <div className="dr-entry-num">{courseNumber(i)}</div>
                   <div className="dr-entry-body">
@@ -1023,6 +1034,7 @@ function MenuDiario({ menu, client }) {
                       {d.name || <span className="placeholder-m">Nome del piatto</span>}
                       <DishPrice value={d.price} />
                       <AllergensInline list={d.allergens} />
+                      <TakeawayTag on={d.takeaway} />
                     </h3>
                     {d.desc && <p className="dr-entry-desc">{d.desc}</p>}
                     {d.story && <p className="dr-entry-story">{d.story}</p>}
@@ -1092,7 +1104,13 @@ function MenuListino({ menu, client }) {
           <div className="lst-body" data-fitbox style={{ columnCount: cols }}>
             {groupsFor(pg).map((g, gi) => (
               <section className="lst-group" key={gi}>
-                {g.section && <div className="lst-sec" data-fithead>{g.section}{g.cont ? " (segue)" : ""}</div>}
+                {g.section && (
+                  <div className={"lst-sec" + (secMeta(menu, g.section).takeaway ? " lst-sec-takeaway" : "")} data-fithead>
+                    {secMeta(menu, g.section).divider && !g.cont && <span className="ms-divider" aria-hidden="true"></span>}
+                    {g.section}{g.cont ? " (segue)" : ""}
+                    {secMeta(menu, g.section).takeaway && <em className="ms-tag">asporto</em>}
+                  </div>
+                )}
                 {g.items.map((d, di) => (
                   <div className="lst-item" key={di} data-di={pg.start + g.off + di}>
                     <div className="lst-item-head">
@@ -1100,6 +1118,7 @@ function MenuListino({ menu, client }) {
                         {d.name || "—"}
                         {d.allergens && d.allergens.length > 0 &&
                           <span className="lst-allg"> ({[...d.allergens].sort((a, b) => a - b).join("·")})</span>}
+                        <TakeawayTag on={d.takeaway} />
                       </span>
                       <DishPrice value={d.price} />
                     </div>
@@ -1135,7 +1154,7 @@ function romanize(n){
 Object.assign(window, {
   MenuClassico, MenuContemporaneo, MenuTabula, MenuEditoriale, MenuDiario, MenuListino,
   Brand, DishPrice, CoastWave, Citrus, Draggable, DragCtx,
-  formatDate, formatPrice, ALLERGENI,
+  formatDate, formatPrice, ALLERGENI, secMeta,
   GRID_DEFAULTS, gridOf, paginateDishes, WEIGHTS, colStyle, sectionGroups,
   FREE_BLOCKS, tagFreeBlocks, applyFreeLayout, installFreeDrag
 });
