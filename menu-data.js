@@ -588,6 +588,18 @@ const EMPTY_MENU = {
 // Migration helper — old menu data may lack 'story'/'image'/'layout'
 function normalizeMenu(m){
   if (!m) return EMPTY_MENU;
+  // Riparazione: una sezione appartiene a UNA macroarea. Se una voce ha la
+  // macroarea vuota ma le altre della sua sezione ce l'hanno, la eredita —
+  // altrimenti spezzerebbe la pagina creando un'area fantasma.
+  const src = (m.dishes || []);
+  const bySection = {};
+  src.forEach(d => {
+    const sec = d.section || "";
+    if (!bySection[sec] && d.area) bySection[sec] = d.area;
+  });
+  const healed = src.map(d => (d.area || !bySection[d.section || ""])
+    ? d : { ...d, area: bySection[d.section || ""] });
+  m = { ...m, dishes: healed };
   return {
     ...EMPTY_MENU,
     ...m,
