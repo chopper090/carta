@@ -116,6 +116,40 @@ function App(){
   // L'anteprima è pesante (impaginazione misurata su decine di pagine): la
   // aggiorniamo "in differita" così la digitazione nel form resta immediata.
   const previewMenu = useDeferredValue(menu);
+  // ---- larghezza dell'editor, trascinabile come le finestre ----
+  const EDITOR_W_DEF = 420;
+  const [editorW, setEditorW] = useState(() => {
+    const v = parseInt(localStorage.getItem("ui.editorW") || "", 10);
+    return (v >= 260 && v <= 1200) ? v : EDITOR_W_DEF;
+  });
+  const splitRef = useRef(null);
+  const startSplit = useCallback((e) => {
+    if (e.button != null && e.button !== 0) return;
+    e.preventDefault();
+    const el = splitRef.current;
+    if (el) el.classList.add("dragging");
+    document.body.classList.add("split-dragging");
+    let w = editorW;
+    const onMove = (ev) => {
+      const max = Math.max(320, window.innerWidth - 340);
+      w = Math.max(260, Math.min(max, Math.round(ev.clientX)));
+      setEditorW(w);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      if (el) el.classList.remove("dragging");
+      document.body.classList.remove("split-dragging");
+      try { localStorage.setItem("ui.editorW", String(w)); } catch(err){}
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [editorW]);
+  const resetSplit = () => {
+    setEditorW(EDITOR_W_DEF);
+    try { localStorage.setItem("ui.editorW", String(EDITOR_W_DEF)); } catch(err){}
+  };
+
   const [zoom, setZoom] = useState(0.55);
   const previewRef = useRef(null);
   const [pageCount, setPageCount] = useState(1);
@@ -197,7 +231,7 @@ function App(){
     window.addEventListener("resize", fitZoom);
     return () => window.removeEventListener("resize", fitZoom);
   }, [fitZoom]);
-  useEffect(() => { fitZoom(); }, [mview, variant, fitZoom]);
+  useEffect(() => { fitZoom(); }, [mview, variant, editorW, fitZoom]);
 
   // ---- conta le pagine renderizzate (per il navigatore) ----
   useEffect(() => {
@@ -329,7 +363,8 @@ function App(){
   const zoomOut = () => setZoom(z => Math.max(0.3, Math.round((z - 0.05) * 100) / 100));
 
   return (
-    <div className="app" data-client={clientId} data-mview={mview} data-print-scope="all">
+    <div className="app" data-client={clientId} data-mview={mview} data-print-scope="all"
+      style={{ "--editor-w": editorW + "px" }}>
       <Form
         menu={menu}
         setMenu={setMenu}
@@ -342,6 +377,10 @@ function App(){
         onPrint={printMenu}
         onExport={exportMenu}
       />
+      <div className="split-handle" ref={splitRef} onPointerDown={startSplit}
+        onDoubleClick={resetSplit} role="separator" aria-orientation="vertical"
+        title="Trascina per ridimensionare · doppio clic per reimpostare"></div>
+
       <div className="preview-pane" ref={previewRef} data-client={clientId}>
         <div className="preview-toolbar">
           <div className="ptb-dot"></div>
