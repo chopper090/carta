@@ -24,6 +24,12 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
   const sectionNames = [...new Set((menu.dishes || []).map(d => d.section).filter(Boolean))];
   // stringa (non array) → le schede memoizzate non si ri-renderizzano inutilmente
   const sectionsKey = sectionNames.join("\u0001");
+  const matches = (i) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    const d = menu.dishes[i] || {};
+    return (d.name || "").toLowerCase().includes(q) || (d.desc || "").toLowerCase().includes(q);
+  };
 
   const updateField = (field, value) => {
     setMenu(prev => ({ ...prev, [field]: value }));
@@ -232,6 +238,145 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
     dishes: [...prev.dishes,
       { name: "", section: "Nuova sezione", desc: "", story: "", image: null, price: null, takeaway: false, allergens: [] }]
   }));
+
+  // ---- Stato dell'editor: vista, ricerca, selezione, richiusure ----
+  const [compact, setCompact] = useState(true);
+  const [openDish, setOpenDish] = useState(null);
+  const [query, setQuery] = useState("");
+  const [sel, setSel] = useState(() => new Set());
+  const [closedSecs, setClosedSecs] = useState(() => new Set());
+  const [closedAreas, setClosedAreas] = useState(() => new Set());
+  const [showIndex, setShowIndex] = useState(false);
+  const dragIdx = useRef(null);
+
+  const toggleIn = (setter) => (key) => setter(prev => {
+    const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n;
+  });
+  const toggleSec = toggleIn(setClosedSecs);
+  const toggleArea = toggleIn(setClosedAreas);
+  const clearSel = () => setSel(new Set());
+  const toggleSel = (i) => setSel(prev => {
+    const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n;
+  });
+
+  // Estremi del blocco di voci consecutive di una sezione
+  const runOf = (dishes, sec) => {
+    const t = sec || "";
+    const first = dishes.findIndex(d => (d.section || "") === t);
+    if (first < 0) return null;
+    let end = first;
+    while (end + 1 < dishes.length && (dishes[end + 1].section || "") === t) end++;
+    return { first, end };
+  };
+
+  // SPOSTA davvero il piatto nella sezione scelta (in coda a quella sezione,
+  // ereditandone la macroarea). Niente sezioni doppie o spezzate.
+  const moveDishToSection = React.useCallback((i, sec) => {
+    setMenu(prev => {
+      const dishes = [...prev.dishes];
+      const [d] = dishes.splice(i, 1);
+      const r = runOf(dishes, sec);
+      if (r){
+        dishes.splice(r.end + 1, 0, { ...d, section: sec, area: dishes[r.first].area || "" });
+      } else {
+        dishes.push({ ...d, section: sec });        // sezione nuova → in fondo
+      }
+      return { ...prev, dishes };
+    });
+    clearSel(); setOpenDish(null);
+  }, [setMenu]);
+
+  // In cima / in fondo alla propria sezione (1 clic invece di N)
+  const moveDishEdge = React.useCallback((i, where) => {
+    setMenu(prev => {
+      const dishes = [...prev.dishes];
+      const sec = dishes[i].section || "";
+      let a = i; while (a - 1 >= 0 && (dishes[a - 1].section || "") === sec) a--;
+      let b = i; while (b + 1 < dishes.length && (dishes[b + 1].section || "") === sec) b++;
+      const [d] = dishes.splice(i, 1);
+      dishes.splice(where === "top" ? a : b, 0, d);
+      return { ...prev, dishes };
+    });
+    setOpenDish(null);
+  }, [setMenu]);
+
+  // Trascinamento: la voce prende posto (e sezione/macroarea) di quella su cui la lasci
+  const moveDishTo = React.useCallback((from, to) => {
+    setMenu(prev => {
+      if (from === to) return prev;
+      const dishes = [...prev.dishes];
+      const t = dishes[to];
+      const [d] = dishes.splice(from, 1);
+      dishes.splice(from < to ? to - 1 : to, 0,
+        { ...d, section: t.section || "", area: t.area || "" });
+      return { ...prev, dishes };
+    });
+    clearSel(); setOpenDish(null);
+  }, [setMenu]);
+
+  // Trascinamento a eventi puntatore: funziona con mouse E con il dito,
+  // e non ri-renderizza la lista mentre si trascina (evidenzia via DOM).
+  const startDrag = React.useCallback((i, e) => {
+    if (e.button != null && e.button !== 0) return;
+    e.preventDefault();
+    dragIdx.current = i;
+    let over = null, overEl = null;
+    document.body.classList.add("dish-dragging");
+    const paint = (el, cls) => {
+      if (overEl) overEl.classList.remove("drop-row", "drop-sec");
+      overEl = el; if (el) el.classList.add(cls);
+    };
+    const onMove = (ev) => {
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const row = el && el.closest("[data-dish-idx]");
+      const sec = el && el.closest("[data-sec-drop]");
+      if (row){ over = { type: "row", i: +row.getAttribute("data-dish-idx") }; paint(row, "drop-row"); }
+      else if (sec){ over = { type: "sec", name: sec.getAttribute("data-sec-drop") }; paint(sec, "drop-sec"); }
+      else { over = null; paint(null); }
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.classList.remove("dish-dragging");
+      paint(null);
+      const from = dragIdx.current;
+      dragIdx.current = null;
+      if (from == null || !over) return;
+      if (over.type === "row" && over.i !== from) moveDishTo(from, over.i);
+      else if (over.type === "sec") moveDishToSection(from, over.name);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [moveDishTo, moveDishToSection]);
+
+  // ---- Azioni sulla selezione multipla ----
+  const moveSelToSection = React.useCallback((sec) => {
+    setMenu(prev => {
+      const picked = [...sel].sort((a, b) => a - b).map(k => prev.dishes[k]).filter(Boolean);
+      if (!picked.length) return prev;
+      const rest = prev.dishes.filter((_, k) => !sel.has(k));
+      const r = runOf(rest, sec);
+      const area = r ? (rest[r.first].area || "") : "";
+      const moved = picked.map(d => ({ ...d, section: sec, area }));
+      if (r) rest.splice(r.end + 1, 0, ...moved); else rest.push(...moved);
+      return { ...prev, dishes: rest };
+    });
+    clearSel();
+  }, [setMenu, sel]);
+
+  const removeSel = React.useCallback(() => {
+    setMenu(prev => ({ ...prev, dishes: prev.dishes.filter((_, k) => !sel.has(k)) }));
+    clearSel();
+  }, [setMenu, sel]);
+
+  const duplicateSel = React.useCallback(() => {
+    setMenu(prev => {
+      const out = [];
+      prev.dishes.forEach((d, k) => { out.push(d); if (sel.has(k)) out.push({ ...d }); });
+      return { ...prev, dishes: out };
+    });
+    clearSel();
+  }, [setMenu, sel]);
 
   const handleImageUpload = React.useCallback((i, file) => {
     if (!file) return;
@@ -447,11 +592,66 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
         <div className="section-label-row">
           <div className="section-label">Portate · {menu.dishes.length}</div>
           <span className="mini-btn-row">
-            <button className="mini-btn" onClick={addDish}>+ voce</button>
             <button className="mini-btn" onClick={addSection}>+ sezione</button>
             <button className="mini-btn" onClick={addArea}>+ macroarea</button>
           </span>
         </div>
+
+        {/* barra strumenti: ricerca, vista, indice */}
+        <div className="ed-tools">
+          <input className="ed-search" type="search" value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Cerca una voce…" aria-label="Cerca una voce" />
+          <button className={"ed-tool " + (compact ? "on" : "")}
+            onClick={() => setCompact(c => !c)}
+            title="Vista compatta: una riga per voce">☰</button>
+          <button className={"ed-tool " + (showIndex ? "on" : "")}
+            onClick={() => setShowIndex(v => !v)}
+            title="Indice della struttura">⁝≡</button>
+          <button className="ed-tool" title="Richiudi tutte le sezioni"
+            onClick={() => setClosedSecs(new Set(sectionGroupsUI.map(g => g.sec)))}>⊟</button>
+          <button className="ed-tool" title="Apri tutte le sezioni"
+            onClick={() => { setClosedSecs(new Set()); setClosedAreas(new Set()); }}>⊞</button>
+        </div>
+
+        {/* indice: tutta la struttura in poche righe */}
+        {showIndex && (
+          <div className="ed-index">
+            {areasUI.map((A, ai) => (
+              <div key={"i" + ai}>
+                <div className="ed-index-area">{ai + 1} · {A.area || "senza macroarea"}</div>
+                {A.secs.map((g, si) => (
+                  <button key={si} className="ed-index-sec"
+                    onClick={() => {
+                      setShowIndex(false);
+                      setClosedSecs(prev => { const n = new Set(prev); n.delete(g.sec); return n; });
+                      setTimeout(() => {
+                        const el = document.getElementById("sec-" + encodeURIComponent(g.sec));
+                        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }, 40);
+                    }}>
+                    <span>{ai + 1}.{si + 1}</span> {g.sec || "senza sezione"}
+                    <em>{g.idxs.length}</em>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* azioni sulla selezione multipla */}
+        {sel.size > 0 && (
+          <div className="ed-selbar">
+            <strong>{sel.size} selezionate</strong>
+            <select value="" onChange={e => { if (e.target.value) moveSelToSection(e.target.value); }}>
+              <option value="">sposta in…</option>
+              {sectionNames.map(sn => <option key={sn} value={sn}>{sn}</option>)}
+            </select>
+            <button onClick={duplicateSel} title="Duplica le voci selezionate">⧉</button>
+            <button onClick={removeSel} className="sel-x" title="Elimina le voci selezionate">×</button>
+            <button onClick={clearSel} title="Annulla la selezione">annulla</button>
+          </div>
+        )}
 
         <div className="form-hint">
           {isNarrative && <span className="hint-pill">Racconto visibile</span>}
@@ -459,79 +659,121 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
           {!isNarrative && !isImage && <span className="hint-pill hint-muted">Variante essenziale</span>}
         </div>
 
-        <datalist id="sezioni-list">
-          {sectionNames.map(s => <option key={s} value={s} />)}
-        </datalist>
         <div className="dishes-form">
-          {areasUI.map((A, ai) => (
+          {areasUI.map((A, ai) => {
+            const areaHasMatch = A.secs.some(g => g.idxs.some(i => matches(i)));
+            if (query && !areaHasMatch) return null;
+            const aClosed = closedAreas.has(A.area);
+            return (
             <React.Fragment key={"a" + ai}>
               {(A.area || areasUI.length > 1) && (
-                <AreaRow
-                  area={A.area}
-                  index={ai}
-                  total={areasUI.length}
-                  meta={(menu.areaMeta || {})[A.area || ""] || {}}
-                  maxCols={((typeof GRID_DEFAULTS !== "undefined" && GRID_DEFAULTS) || {})[variant]?.maxCols || 1}
-                  onRename={(v) => renameArea(A.area, v)}
-                  onMeta={(patch) => setAreaMeta(A.area, patch)}
-                  onMove={(d) => moveArea(ai, d)}
-                />
-              )}
-          {A.secs.map(({ gi, ...g }) => (
-            <React.Fragment key={gi}>
-              <div className={"section-move-row" + (((menu.sectionMeta || {})[g.sec] || {}).takeaway ? " sec-takeaway" : "")}>
-                {((menu.sectionMeta || {})[g.sec] || {}).divider && <span className="sec-divider-mark" aria-hidden="true"></span>}
-                <SectionNameInput value={g.sec} count={g.idxs.length} onCommit={(v) => renameSection(g.sec, v)} />
-                <div className="section-move-ctrls">
-                  <button type="button" className={"ctrl-btn ctrl-sep " + (((menu.sectionMeta || {})[g.sec] || {}).divider ? "on" : "")}
-                    onClick={() => toggleSectionFlag(g.sec, "divider")}
-                    title="Separatore arancione prima di questa sezione">▬</button>
-                  <button type="button" className={"ctrl-btn ctrl-take " + (((menu.sectionMeta || {})[g.sec] || {}).takeaway ? "on" : "")}
-                    onClick={() => toggleSectionFlag(g.sec, "takeaway")}
-                    title="Sezione da asporto">⛱</button>
-                  <button type="button" className="ctrl-btn" disabled={gi === 0}
-                    onClick={() => moveSection(gi, -1)}
-                    title="Sposta la sezione su" aria-label="Sposta la sezione su">↑</button>
-                  <button type="button" className="ctrl-btn" disabled={gi === sectionGroupsUI.length - 1}
-                    onClick={() => moveSection(gi, 1)}
-                    title="Sposta la sezione giù" aria-label="Sposta la sezione giù">↓</button>
-                  <button type="button" className="ctrl-btn ctrl-add"
-                    onClick={() => addDishToSection(g.sec, g.idxs[g.idxs.length - 1])}
-                    title="Aggiungi una voce in questa sezione">+</button>
-                </div>
-              </div>
-              {areaNames.length > 0 && (
-                <div className="sec-area-pick">
-                  <span>macroarea</span>
-                  <select value={(menu.dishes[g.idxs[0]] || {}).area || ""}
-                    onChange={e => setSectionArea(g.sec, e.target.value)}>
-                    <option value="">— nessuna —</option>
-                    {areaNames.map(an => <option key={an} value={an}>{an}</option>)}
-                  </select>
+                <div className="area-wrap">
+                  <button className="ed-fold" title={aClosed ? "Apri" : "Richiudi"}
+                    onClick={() => toggleArea(A.area)}>{aClosed ? "▸" : "▾"}</button>
+                  <AreaRow
+                    area={A.area}
+                    index={ai}
+                    total={areasUI.length}
+                    meta={(menu.areaMeta || {})[A.area || ""] || {}}
+                    maxCols={((typeof GRID_DEFAULTS !== "undefined" && GRID_DEFAULTS) || {})[variant]?.maxCols || 1}
+                    onRename={(v) => renameArea(A.area, v)}
+                    onMeta={(patch) => setAreaMeta(A.area, patch)}
+                    onMove={(d) => moveArea(ai, d)}
+                  />
                 </div>
               )}
-              {g.idxs.map(i => (
-                <DishEditor
-                  key={i}
-                  i={i}
-                  dish={menu.dishes[i]}
-                  total={menu.dishes.length}
-                  isNarrative={isNarrative}
-                  isImage={isImage}
-                  onChange={updateDish}
-                  onToggleAllergen={toggleAllergen}
-                  onMove={moveDish}
-                  onRemove={removeDish}
-                  onImageUpload={handleImageUpload}
-                  onImageRemove={removeImage}
-                  onDuplicate={duplicateDish}
-                  sectionsKey={sectionsKey}
-                />
-              ))}
+              {!aClosed && A.secs.map((g, si) => {
+                const idxs = query ? g.idxs.filter(matches) : g.idxs;
+                if (query && !idxs.length) return null;
+                const meta = (menu.sectionMeta || {})[g.sec] || {};
+                const sClosed = closedSecs.has(g.sec);
+                return (
+                <React.Fragment key={g.gi}>
+                  <div id={"sec-" + encodeURIComponent(g.sec)}
+                    className={"section-move-row" + (meta.takeaway ? " sec-takeaway" : "")}
+                    data-sec-drop={g.sec}>
+                    {meta.divider && <span className="sec-divider-mark" aria-hidden="true"></span>}
+                    <button className="ed-fold" title={sClosed ? "Apri" : "Richiudi"}
+                      onClick={() => toggleSec(g.sec)}>{sClosed ? "▸" : "▾"}</button>
+                    <span className="sec-num">{ai + 1}.{si + 1}</span>
+                    <SectionNameInput value={g.sec} count={g.idxs.length} onCommit={(v) => renameSection(g.sec, v)} />
+                    <div className="section-move-ctrls">
+                      <button type="button" className={"ctrl-btn ctrl-sep " + (meta.divider ? "on" : "")}
+                        onClick={() => toggleSectionFlag(g.sec, "divider")}
+                        title="Separatore arancione prima di questa sezione">▬</button>
+                      <button type="button" className={"ctrl-btn ctrl-take " + (meta.takeaway ? "on" : "")}
+                        onClick={() => toggleSectionFlag(g.sec, "takeaway")}
+                        title="Sezione da asporto">⛱</button>
+                      <button type="button" className="ctrl-btn" disabled={g.gi === 0}
+                        onClick={() => moveSection(g.gi, -1)} title="Sposta la sezione su">↑</button>
+                      <button type="button" className="ctrl-btn" disabled={g.gi === sectionGroupsUI.length - 1}
+                        onClick={() => moveSection(g.gi, 1)} title="Sposta la sezione giù">↓</button>
+                      <button type="button" className="ctrl-btn ctrl-add"
+                        onClick={() => { const last = g.idxs[g.idxs.length - 1];
+                          addDishToSection(g.sec, last); setClosedSecs(prev => { const n = new Set(prev); n.delete(g.sec); return n; }); setOpenDish(last + 1); }}
+                        title="Aggiungi una voce in questa sezione">+ piatto</button>
+                    </div>
+                  </div>
+
+                  {!sClosed && areaNames.length > 0 && (
+                    <div className="sec-area-pick">
+                      <span>macroarea</span>
+                      <select value={(menu.dishes[g.idxs[0]] || {}).area || ""}
+                        onChange={e => setSectionArea(g.sec, e.target.value)}>
+                        <option value="">— nessuna —</option>
+                        {areaNames.map(an => <option key={an} value={an}>{an}</option>)}
+                      </select>
+                    </div>
+                  )}
+
+                  {!sClosed && idxs.map((i, di) => (
+                    (compact && openDish !== i) ? (
+                      <DishRow
+                        key={i}
+                        i={i}
+                        num={(ai + 1) + "." + (si + 1) + "." + (di + 1)}
+                        dish={menu.dishes[i]}
+                        selected={sel.has(i)}
+                        dragOn={!query}
+                        onSelect={toggleSel}
+                        onOpen={setOpenDish}
+                        onMove={moveDish}
+                        onEdge={moveDishEdge}
+                        onDuplicate={duplicateDish}
+                        onRemove={removeDish}
+                        onGrip={startDrag}
+                      />
+                    ) : (
+                      <div className="dish-open" key={i}>
+                        {compact && (
+                          <button className="dish-close" onClick={() => setOpenDish(null)}
+                            title="Chiudi">▴ chiudi</button>
+                        )}
+                        <DishEditor
+                          i={i}
+                          dish={menu.dishes[i]}
+                          total={menu.dishes.length}
+                          isNarrative={isNarrative}
+                          isImage={isImage}
+                          onChange={updateDish}
+                          onToggleAllergen={toggleAllergen}
+                          onMove={moveDish}
+                          onRemove={removeDish}
+                          onImageUpload={handleImageUpload}
+                          onImageRemove={removeImage}
+                          onDuplicate={duplicateDish}
+                          onSectionMove={moveDishToSection}
+                          sectionsKey={sectionsKey}
+                        />
+                      </div>
+                    )
+                  ))}
+                </React.Fragment>
+                );
+              })}
             </React.Fragment>
-          ))}
-            </React.Fragment>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -560,6 +802,36 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
     </aside>
   );
 }
+
+// ============================================================
+// Riga compatta di una voce — una riga sola, trascinabile.
+// ============================================================
+const DishRow = React.memo(function DishRow({ i, num, dish, selected, dragOn,
+  onSelect, onOpen, onMove, onEdge, onDuplicate, onRemove, onGrip }){
+  return (
+    <div className={"dish-line" + (selected ? " on" : "")} data-dish-idx={i}>
+      <input type="checkbox" checked={selected} onChange={() => onSelect(i)}
+        aria-label="Seleziona la voce" />
+      {dragOn && <span className="dl-grip" title="Trascina per spostare"
+        onPointerDown={e => onGrip(i, e)}>⠿</span>}
+      <span className="dl-num">{num}</span>
+      <span className="dl-name" onClick={() => onOpen(i)} title="Apri per modificare">
+        {dish.name || <em>senza nome</em>}
+        {dish.takeaway && <b className="dl-take">asporto</b>}
+      </span>
+      {(dish.price || dish.price === 0) && <span className="dl-price">{dish.price} €</span>}
+      <span className="dl-ctrls">
+        <button onClick={() => onEdge(i, "top")} title="In cima alla sezione">⤒</button>
+        <button onClick={() => onMove(i, -1)} title="Su">↑</button>
+        <button onClick={() => onMove(i, 1)} title="Giù">↓</button>
+        <button onClick={() => onEdge(i, "bottom")} title="In fondo alla sezione">⤓</button>
+        <button onClick={() => onOpen(i)} title="Modifica">✎</button>
+        <button onClick={() => onDuplicate(i)} title="Duplica">⧉</button>
+        <button className="dl-x" onClick={() => onRemove(i)} title="Elimina">×</button>
+      </span>
+    </div>
+  );
+});
 
 // ============================================================
 // MACROAREA — separatore arancione a tutta pagina con nome proprio e
@@ -656,7 +928,7 @@ function SectionNameInput({ value, count, onCommit }){
 // ============================================================
 // DishEditor — sub-component per ogni piatto
 // ============================================================
-const DishEditor = React.memo(function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAllergen, onMove, onRemove, onImageUpload, onImageRemove, onDuplicate, sectionsKey }){
+const DishEditor = React.memo(function DishEditor({ i, dish, total, isNarrative, isImage, onChange, onToggleAllergen, onMove, onRemove, onImageUpload, onImageRemove, onDuplicate, onSectionMove, sectionsKey }){
   const fileRef = useRef(null);
 
   const openPicker = () => fileRef.current?.click();
@@ -681,7 +953,7 @@ const DishEditor = React.memo(function DishEditor({ i, dish, total, isNarrative,
       <label className="field">
         <span className="field-label">
           Sezione
-          <span className="field-flag">sposta la voce in un'altra sezione</span>
+          <span className="field-flag">la voce viene spostata dentro la sezione scelta</span>
         </span>
         <select
           className="section-select"
@@ -689,8 +961,8 @@ const DishEditor = React.memo(function DishEditor({ i, dish, total, isNarrative,
           onChange={e => {
             if (e.target.value === "__new__"){
               const n = prompt("Nome della nuova sezione:", dish.section || "");
-              if (n !== null) onChange(i, "section", n.trim());
-            } else onChange(i, "section", e.target.value);
+              if (n !== null) onSectionMove(i, n.trim());
+            } else onSectionMove(i, e.target.value);
           }}>
           {(sectionsKey || "").split("\u0001").filter(Boolean).map(sn =>
             <option key={sn} value={sn}>{sn}</option>)}
