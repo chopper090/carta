@@ -42,6 +42,12 @@ blocco `FREE_BLOCKS` → si sposta e ridimensiona in modalità libera. Con
 `areaMeta[nome].samePage` la macroarea resta sul foglio della precedente: la
 banda diventa `.area-band-inline` (`column-span: all`) e taglia le colonne.
 
+**Editor.** Vista compatta (`DishRow`, una riga per voce) con apertura a
+fisarmonica, ricerca, indice della struttura, sezioni/macroaree richiudibili,
+selezione multipla e trascinamento a eventi puntatore (mouse + tocco).
+Cambiare sezione a una voce la **sposta davvero** (`moveDishToSection`), non
+la rietichetta sul posto. `moveDishEdge` = in cima/in fondo alla sezione.
+
 **Sezioni.** `menu.sectionMeta[nome] = { divider, takeaway }` — separatore arancione
 prima della sezione e marchio "asporto". Sul piatto: `takeaway: true` mostra
 l'etichetta arancione. Dal form si rinomina la sezione (propaga a tutte le sue
