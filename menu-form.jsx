@@ -218,8 +218,10 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
   const addDishToSection = React.useCallback((name, lastIdx) => {
     setMenu(prev => {
       const dishes = [...prev.dishes];
+      const src = dishes[lastIdx] || {};
       dishes.splice(lastIdx + 1, 0,
-        { name: "", section: name || "", desc: "", story: "", image: null, price: null, takeaway: false, allergens: [] });
+        { name: "", section: name || "", area: src.area || "", desc: "", story: "",
+          image: null, price: null, takeaway: false, mark: 0, allergens: [] });
       return { ...prev, dishes };
     });
   }, [setMenu]);
@@ -233,11 +235,12 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
   }, [setMenu]);
 
   // Nuova sezione vuota in fondo
-  const addSection = () => setMenu(prev => ({
-    ...prev,
-    dishes: [...prev.dishes,
-      { name: "", section: "Nuova sezione", desc: "", story: "", image: null, price: null, takeaway: false, allergens: [] }]
-  }));
+  const addSection = () => setMenu(prev => {
+    const last = prev.dishes[prev.dishes.length - 1] || {};
+    return { ...prev, dishes: [...prev.dishes,
+      { name: "", section: "Nuova sezione", area: last.area || "", desc: "", story: "",
+        image: null, price: null, takeaway: false, mark: 0, allergens: [] }] };
+  });
 
   // ---- Stato dell'editor: vista, ricerca, selezione, richiusure ----
   const [compact, setCompact] = useState(true);
