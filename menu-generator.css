@@ -2414,8 +2414,33 @@ body.split-dragging{ cursor: col-resize; user-select: none; }
   letter-spacing: .22em; text-transform: uppercase; color: var(--sep-orange, #F2972E);
   white-space: nowrap;
 }
+/* nota esplicativa sotto la banda della macroarea */
+.area-band-wrap{ width: 100%; }
+.area-note{
+  margin: 2mm 0 0; text-align: center;
+  font-family: var(--f-body); font-weight: 300; font-size: 8pt; line-height: 1.35;
+  color: var(--warm-grey); font-style: italic;
+}
+.sheet-listino .area-note{ font-size: 7.6pt; margin-top: 1.5mm; }
+
+/* asterischi sulle voci + legenda */
+.dish-mark{
+  font-family: var(--f-mono); font-size: .78em; color: var(--sep-orange, #F2972E);
+  margin-left: 3px; vertical-align: super; letter-spacing: 0;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.marks-legend{
+  font-family: var(--f-body); font-weight: 300; font-size: 6.6pt; line-height: 1.4;
+  color: var(--warm-grey); margin-bottom: 3px;
+}
+.marks-legend .mk{
+  font-family: var(--f-mono); color: var(--sep-orange, #F2972E); margin-right: 3px;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.lst-marks{ padding-bottom: 3px; border-bottom: 1px solid var(--line-soft); margin-bottom: 4px; }
+
 /* banda a metà pagina: attraversa tutte le colonne */
-.area-band-inline{
+.area-band-wrap.area-band-inline{
   column-span: all; -webkit-column-span: all;
   margin: 6mm 0 5mm; break-after: avoid; page-break-after: avoid;
 }
@@ -2688,6 +2713,23 @@ body.dish-dragging .dl-grip{ cursor: grabbing; }
   width: auto; min-width: 0; padding: 0 8px; font-size: 10px; letter-spacing: .04em;
 }
 .mini-btn-row{ display: flex; gap: 6px; }
+
+/* Editor · scelta asterischi + nota macroarea + diciture legali */
+.mark-pick{ display: flex; gap: 6px; }
+.mark-btn{
+  flex: 1; padding: 7px 0; border: 1px solid var(--line-soft); background: var(--cream-deep);
+  color: var(--warm-grey); border-radius: 7px; cursor: pointer;
+  font-family: var(--f-mono); font-size: 12px; transition: all .15s;
+}
+.mark-btn:hover{ border-color: var(--sep-orange, #F2972E); color: var(--ink); }
+.mark-btn.on{ background: var(--sep-orange, #F2972E); color: #fff; border-color: var(--sep-orange, #F2972E); }
+.area-note-input{
+  width: 100%; margin-top: 6px; background: var(--cream); border: 1px solid var(--line-soft);
+  border-radius: 6px; padding: 5px 7px; color: var(--ink); font-size: 11.5px; font-style: italic;
+}
+.area-note-input:focus{ border-color: var(--sep-orange, #F2972E); outline: none; }
+.mk-lab{ font-family: var(--f-mono); font-style: normal; color: var(--sep-orange, #F2972E); margin-right: 5px; }
+.dl-mark{ font-family: var(--f-mono); font-size: 10px; color: var(--sep-orange, #F2972E); margin-left: 5px; }
 
 /* Editor · tendina sezione + interruttore asporto nella scheda voce */
 .section-select{ width: 100%; }

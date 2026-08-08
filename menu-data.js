@@ -223,7 +223,10 @@ const BARETTO_CLASSICI = {
   ]
 };
 
-const CUC = (name, section, desc, allergens) => ({ name, section, desc, story: "", image: null, price: null, allergens });
+const CUC = (name, section, desc, allergens, area) => ({
+  name, section, desc, story: "", image: null, price: null,
+  area: area || "Ai Tavoli", takeaway: false, mark: 0, allergens
+});
 
 const BARETTO_CUCINA = {
   name: "Cucina",
@@ -233,45 +236,50 @@ const BARETTO_CUCINA = {
   chef: "il baretto",
   seats: 8,
   chefNote: "La cucina del baretto: dalla piazzetta agli sfizi, dai buns ai piatti. Mare, agrumi e Sicilia.",
+  grid: { listino: { cols: 2, perPage: 0 } },
+  areaMeta: {
+    "Ai Tavoli": { cols: 2,
+      note: "Servizio al tavolo: è disponibile l'intero menù, compresi i piatti della sezione «Sulle Scale»." },
+    "Sulle Scale": { cols: 2, samePage: true,
+      note: "Posti in piedi: si ordina solo dalla selezione da asporto qui elencata." }
+  },
+  sectionMeta: {
+    "Buns":   { takeaway: true },
+    "Cuoppi": { takeaway: true }
+  },
   dishes: [
-    // — Piazzetta —
+    // ===== AI TAVOLI — offerta completa =====
     CUC("Piazzetta", "Piazzetta", "arachidi, ceci, pinzimonio (carote, cetrioli) + vinaigrette/citronette", [5, 8]),
 
-    // — Salse —
     CUC("Tzatziki", "Salse", "yogurt, cetriolo, aglio, menta, olio, sale", [7]),
     CUC("Hummus", "Salse", "ceci, tahina, succo di lime, paprika, aglio, olio, sale", [11]),
     CUC("Guacamole", "Salse", "avocado, succo di lime, cipolla, pomodoro, sale, peperoncino", []),
     CUC("Alpino", "Salse", "rucola, caprino, mandorle, sale, pepe nero, olio", [7, 8]),
 
-    // — Buns —
-    CUC("Classicone", "Buns", "mortadella, limone, pepe", [1]),
-    CUC("Little Tonny", "Buns", "tartare di tonno con agrumi, zenzero e capperi, salsa yogurt con jalapeño verde, provola affumicata, valeriana", [1, 4, 7]),
-    CUC("Pa-nino", "Buns", "controfiletto di manzo (cbt), composta di cipolle, rucola, scaglie di parmigiano, salsa mayo e senape", [1, 3, 7, 10]),
-    CUC("Vegburger", "Buns", "hamburger vegano — ricetta da definire", [1]),
-
-    // — Crostoni —
     CUC("Burro alle erbe e alici", "Crostoni", "Pane tostato, burro montato con erbe aromatiche, acciuga del Cantabrico, zesti di limone", [1, 4, 7]),
     CUC("Baccalà mantecato", "Crostoni", "Pane tostato, baccalà mantecato, erba cipollina", [1, 4]),
 
-    // — Sfizi —
-    CUC("Fish & Chips", "Sfizi", "Black Cod (merluzzo carbonaro) in pastella, chips di patate con buccia, salsa tartara (maionese, cetriolini sott'aceto, capperi. Servito con salsa Worchestershire)", [1, 3, 4]),
-    CUC("Panella e tartare di carne", "Sfizi", "Farina di ceci, tartare di manzo, maionese di cappero, maionese di acciughe, tuorlo marinato, aneto e ravanello.", [3, 4]),
-    CUC("Scagghiozza", "Sfizi", "Polenta, salsa verde, acciughe del Cantabrico/Lingua di bovino", [4]),
-    CUC("Falafel", "Sfizi", "ceci, prezzemolo, cumino, coriandolo, za'atar. Servito con Tzatziki", []),
-    CUC("Mix", "Sfizi", "1 pz di: panella, scagghiozza e falafel.", []),
-    CUC("Frittata di Pasta alla Napoletana: Genovese", "Sfizi", "Spaghettone, cipolle, manzo, sedano, carote, besciamella, sale, pepe, farina e panko.", [1, 9]),
-    CUC("Frittata di Pasta alla Napoletana: Carbonara", "Sfizi", "Spaghettone, Salsa carbonara (tuorlo d'uovo, pecorino, parmigiano, pepe), besciamella, guanciale, farina e Panko", [1, 3, 7, 12]),
-
-    // — Insalatine —
     CUC("Oriental Crunch", "Insalatine", "misticanza, Dressing agli Agrumi (agrumi, soia, olio di semi, aglio e pepe), pomodori confit, Formaggio al Cocco, mela, noci", [6, 8]),
 
-    // — Piatti —
     CUC("Carpaccio di tonno", "Piatti", "tonno, cetriolo, menta, mela, Dressing agli Agrumi (agrumi, soia, olio di semi, aglio e pepe)", [4, 6]),
     CUC("Caprese", "Piatti", "Selezione di pomodorini, basilico, Mozzarella di bufala (250 g), olio e sale maldon", [7]),
     CUC("Carpaccio di Black Angus", "Piatti", "carpaccio di Black Angus, rucola, scaglie di parmigiano", [7]),
 
-    // — Signature —
-    CUC("Crispy tamago", "Signature", "maionese di baccalà, gel umadashi (Brodo verdure, salsa di soia), uovo poché panato nel panko e fritto, coste di bietola osmotizzate con soia affumicata al katsuobushi, erba cipollina, sale maldon", [1, 3, 4, 6, 9])
+    CUC("Crispy tamago", "Signature", "maionese di baccalà, gel umadashi (Brodo verdure, salsa di soia), uovo poché panato nel panko e fritto, coste di bietola osmotizzate con soia affumicata al katsuobushi, erba cipollina, sale maldon", [1, 3, 4, 6, 9]),
+
+    // ===== SULLE SCALE — solo da asporto =====
+    CUC("Classicone", "Buns", "mortadella, limone, pepe", [1], "Sulle Scale"),
+    CUC("Little Tonny", "Buns", "tartare di tonno con agrumi, zenzero e capperi, salsa yogurt con jalapeño verde, provola affumicata, valeriana", [1, 4, 7], "Sulle Scale"),
+    CUC("Pa-nino", "Buns", "controfiletto di manzo (cbt), composta di cipolle, rucola, scaglie di parmigiano, salsa mayo e senape", [1, 3, 7, 10], "Sulle Scale"),
+    CUC("Vegburger", "Buns", "hamburger vegano — ricetta da definire", [1], "Sulle Scale"),
+
+    CUC("Fish & Chips", "Cuoppi", "Black Cod (merluzzo carbonaro) in pastella, chips di patate con buccia, salsa tartara (maionese, cetriolini sott'aceto, capperi. Servito con salsa Worchestershire)", [1, 3, 4], "Sulle Scale"),
+    CUC("Panella e tartare di carne", "Cuoppi", "Farina di ceci, tartare di manzo, maionese di cappero, maionese di acciughe, tuorlo marinato, aneto e ravanello.", [3, 4], "Sulle Scale"),
+    CUC("Scagghiozza", "Cuoppi", "Polenta, salsa verde, acciughe del Cantabrico/Lingua di bovino", [4], "Sulle Scale"),
+    CUC("Falafel", "Cuoppi", "ceci, prezzemolo, cumino, coriandolo, za'atar. Servito con Tzatziki", [], "Sulle Scale"),
+    CUC("Mix", "Cuoppi", "1 pz di: panella, scagghiozza e falafel.", [], "Sulle Scale"),
+    CUC("Frittata di Pasta alla Napoletana: Genovese", "Cuoppi", "Spaghettone, cipolle, manzo, sedano, carote, besciamella, sale, pepe, farina e panko.", [1, 9], "Sulle Scale"),
+    CUC("Frittata di Pasta alla Napoletana: Carbonara", "Cuoppi", "Spaghettone, Salsa carbonara (tuorlo d'uovo, pecorino, parmigiano, pepe), besciamella, guanciale, farina e Panko", [1, 3, 7, 12], "Sulle Scale")
   ]
 };
 
@@ -566,7 +574,11 @@ const EMPTY_MENU = {
   chefNote: "",
   layout: {},   // posizioni drag&drop per variante: { [variante]: { [id]: {x,y,s,h} } }
   sectionMeta: {},  // per nome sezione: { divider: separatore arancione prima, takeaway: sezione asporto }
-  areaMeta: {},     // per nome MACROAREA: { cols, perPage } — impaginazione indipendente
+  areaMeta: {},     // per nome MACROAREA: { cols, perPage, samePage, note }
+  markNotes: {      // diciture degli asterischi (modificabili dal form)
+    one: "Prodotto surgelato all'origine.",
+    two: "Prodotto fresco di nostra produzione, sottoposto ad abbattimento rapido di temperatura in loco (piano HACCP)."
+  },
   grid: {},     // impaginazione per variante: { [variante]: { cols, perPage } }  (perPage 0 = auto)
   dishes: [
     { name: "", section: "", desc: "", story: "", image: null, price: null, allergens: [] }
@@ -583,6 +595,7 @@ function normalizeMenu(m){
     grid: m.grid || {},
     sectionMeta: m.sectionMeta || {},
     areaMeta: m.areaMeta || {},
+    markNotes: { ...EMPTY_MENU.markNotes, ...(m.markNotes || {}) },
     dishes: (m.dishes || []).map(d => ({
       name: d.name || "",
       area: d.area || "",
@@ -592,6 +605,7 @@ function normalizeMenu(m){
       image: d.image || null,
       price: (d.price === 0 || d.price) ? d.price : null,
       takeaway: !!d.takeaway,
+      mark: (d.mark === 1 || d.mark === 2) ? d.mark : 0,
       allergens: d.allergens || []
     }))
   };
