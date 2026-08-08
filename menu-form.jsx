@@ -778,6 +778,23 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
       </div>
 
       <div className="form-section">
+        <div className="section-label">Diciture legali · asterischi</div>
+        <div className="field-grid">
+          <label className="field field-wide">
+            <span className="field-label"><em className="mk-lab">*</em> un asterisco</span>
+            <textarea rows="2" value={(menu.markNotes || {}).one || ""}
+              onChange={e => updateField("markNotes", { ...(menu.markNotes || {}), one: e.target.value })} />
+          </label>
+          <label className="field field-wide">
+            <span className="field-label"><em className="mk-lab">**</em> due asterischi</span>
+            <textarea rows="2" value={(menu.markNotes || {}).two || ""}
+              onChange={e => updateField("markNotes", { ...(menu.markNotes || {}), two: e.target.value })} />
+          </label>
+        </div>
+        <p className="cols-hint">Le diciture compaiono in fondo al menù solo se almeno una voce usa quell'asterisco.</p>
+      </div>
+
+      <div className="form-section">
         <div className="section-label">Esporta</div>
         <div className="export-row">
           <button className="primary-btn" onClick={onPrint}>
@@ -817,6 +834,7 @@ const DishRow = React.memo(function DishRow({ i, num, dish, selected, dragOn,
       <span className="dl-num">{num}</span>
       <span className="dl-name" onClick={() => onOpen(i)} title="Apri per modificare">
         {dish.name || <em>senza nome</em>}
+        {dish.mark ? <b className="dl-mark">{dish.mark === 1 ? "*" : "**"}</b> : null}
         {dish.takeaway && <b className="dl-take">asporto</b>}
       </span>
       {(dish.price || dish.price === 0) && <span className="dl-price">{dish.price} €</span>}
@@ -864,6 +882,9 @@ function AreaRow({ area, index, total, meta, maxCols, onRename, onMeta, onMove }
             onClick={() => onMove(1)} title="Sposta la macroarea giù">↓</button>
         </div>
       </div>
+      <input className="area-note-input" value={meta.note || ""}
+        placeholder="Nota di questa macroarea (spiega a chi è dedicata)…"
+        onChange={e => onMeta({ note: e.target.value })} />
       <div className="area-row-grid">
         {maxCols > 1 && (
           <span className="area-mini">
@@ -970,6 +991,20 @@ const DishEditor = React.memo(function DishEditor({ i, dish, total, isNarrative,
           <option value="__new__">+ nuova sezione…</option>
         </select>
       </label>
+
+      <div className="field">
+        <span className="field-label">
+          Dicitura asterischi
+          <span className="field-flag">* surgelato all'origine · ** fresco abbattuto da noi</span>
+        </span>
+        <div className="mark-pick">
+          {[[0, "nessuno"], [1, "*"], [2, "**"]].map(([v, lab]) => (
+            <button key={v} type="button"
+              className={"mark-btn " + ((dish.mark || 0) === v ? "on" : "")}
+              onClick={() => onChange(i, "mark", v)}>{lab}</button>
+          ))}
+        </div>
+      </div>
 
       <label className="field field-takeaway">
         <span className="field-label">Disponibile da asporto</span>

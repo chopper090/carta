@@ -531,16 +531,36 @@ const WaveRule = () => (
 );
 
 // Separatore ondulato a tutta pagina che apre una macroarea (col suo nome).
-const AreaBand = ({ name, inline }) => (
-  <div className={"area-band" + (inline ? " area-band-inline" : "")} data-fithead>
-    <WaveRule />
-    {name ? <span className="area-band-name">{name}</span> : null}
-    {name ? <WaveRule /> : null}
+const AreaBand = ({ name, note, inline }) => (
+  <div className={"area-band-wrap" + (inline ? " area-band-inline" : "")} data-fithead>
+    <div className="area-band">
+      <WaveRule />
+      {name ? <span className="area-band-name">{name}</span> : null}
+      {name ? <WaveRule /> : null}
+    </div>
+    {note ? <p className="area-note">{note}</p> : null}
   </div>
 );
 
 // Impostazioni per sezione: separatore arancione e sezione "asporto"
 const secMeta = (menu, name) => ((menu && menu.sectionMeta) || {})[name || ""] || {};
+
+// Asterischi: 1 = surgelato all'origine · 2 = fresco abbattuto da noi
+const DishMark = ({ n }) => n ? <span className="dish-mark" title={n === 1 ? "surgelato all'origine" : "fresco, abbattuto in loco"}>{n === 1 ? "*" : "**"}</span> : null;
+
+// Legenda degli asterischi: compare solo se qualche voce li usa.
+const MarksLegend = ({ menu, className = "" }) => {
+  const list = menu.dishes || [];
+  const n1 = list.some(d => d.mark === 1), n2 = list.some(d => d.mark === 2);
+  if (!n1 && !n2) return null;
+  const t = menu.markNotes || {};
+  return (
+    <div className={"marks-legend " + className}>
+      {n1 && <div><span className="mk">*</span> {t.one}</div>}
+      {n2 && <div><span className="mk">**</span> {t.two}</div>}
+    </div>
+  );
+};
 
 // Etichetta "asporto" sulla singola voce
 const TakeawayTag = ({ on }) => on ? <span className="dish-takeaway">asporto</span> : null;
@@ -688,7 +708,7 @@ function MenuClassico({ menu, client }) {
             </div>
           </div>
 
-          {opensArea(menu.dishes, pg.start) && areaOf(menu.dishes[pg.start]) && <AreaBand name={areaOf(menu.dishes[pg.start])} />}
+          {opensArea(menu.dishes, pg.start) && areaOf(menu.dishes[pg.start]) && <AreaBand name={areaOf(menu.dishes[pg.start])} note={(((menu.areaMeta || {})[areaOf(menu.dishes[pg.start])] || {}).note)} />}
           <div className="dishes-c" data-fitbox style={colStyle(colsAt(pg.start))}>
             {contSectionOf(menu.dishes, pg.start) &&
               <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="c" takeaway={secMeta(menu, contSectionOf(menu.dishes, pg.start)).takeaway} />}
@@ -697,7 +717,7 @@ function MenuClassico({ menu, client }) {
               return (
                 <React.Fragment key={i}>
                   {idx > 0 && areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && areaOf(menu.dishes[i]) &&
-                    <AreaBand name={areaOf(menu.dishes[i])} inline />}
+                    <AreaBand name={areaOf(menu.dishes[i])} note={(((menu.areaMeta || {})[areaOf(menu.dishes[i])] || {}).note)} inline />}
                   {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="c" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                   <div className="dish-c" data-di={i}>
                     <div className="dish-num-c">{courseNumber(i)}</div>
@@ -705,7 +725,7 @@ function MenuClassico({ menu, client }) {
                       {d.name || <span className="placeholder-c">Nome del piatto</span>}
                       <DishPrice value={d.price} />
                       <AllergensInline list={d.allergens} />
-                      <TakeawayTag on={d.takeaway} />
+                      <DishMark n={d.mark} /><TakeawayTag on={d.takeaway} />
                     </h3>
                     {d.desc && <p className="dish-desc-c">{d.desc}</p>}
                     {idx < pg.items.length - 1 && !startsSection(menu.dishes, i + 1) && (
@@ -810,7 +830,7 @@ function MenuContemporaneo({ menu, client }) {
             <span className="inner-name-m">{menu.name} · {portate} {isPriceList(menu) ? "voci" : "portate"}</span>
           </div>
 
-          {opensArea(menu.dishes, pg.start) && areaOf(menu.dishes[pg.start]) && <AreaBand name={areaOf(menu.dishes[pg.start])} />}
+          {opensArea(menu.dishes, pg.start) && areaOf(menu.dishes[pg.start]) && <AreaBand name={areaOf(menu.dishes[pg.start])} note={(((menu.areaMeta || {})[areaOf(menu.dishes[pg.start])] || {}).note)} />}
           <div className="dishes-m" data-fitbox style={colStyle(colsAt(pg.start))}>
             {contSectionOf(menu.dishes, pg.start) &&
               <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="m" takeaway={secMeta(menu, contSectionOf(menu.dishes, pg.start)).takeaway} />}
@@ -819,7 +839,7 @@ function MenuContemporaneo({ menu, client }) {
               return (
                 <React.Fragment key={i}>
                   {idx > 0 && areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && areaOf(menu.dishes[i]) &&
-                    <AreaBand name={areaOf(menu.dishes[i])} inline />}
+                    <AreaBand name={areaOf(menu.dishes[i])} note={(((menu.areaMeta || {})[areaOf(menu.dishes[i])] || {}).note)} inline />}
                   {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="m" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                   <div className="dish-m" data-di={i}>
                     <div className="dish-left-m">
@@ -830,7 +850,7 @@ function MenuContemporaneo({ menu, client }) {
                         {d.name || <span className="placeholder-m">Nome del piatto</span>}
                         <DishPrice value={d.price} />
                         <AllergensInline list={d.allergens} />
-                        <TakeawayTag on={d.takeaway} />
+                        <DishMark n={d.mark} /><TakeawayTag on={d.takeaway} />
                       </h3>
                       {d.desc && <p className="dish-desc-m">{d.desc}</p>}
                     </div>
@@ -900,7 +920,7 @@ function MenuTabula({ menu, client }) {
             </div>
           )}
 
-          {opensArea(menu.dishes, pg.start) && areaOf(menu.dishes[pg.start]) && <AreaBand name={areaOf(menu.dishes[pg.start])} />}
+          {opensArea(menu.dishes, pg.start) && areaOf(menu.dishes[pg.start]) && <AreaBand name={areaOf(menu.dishes[pg.start])} note={(((menu.areaMeta || {})[areaOf(menu.dishes[pg.start])] || {}).note)} />}
           <div className="tab-dishes" data-fitbox style={colStyle(colsAt(pg.start))}>
             {contSectionOf(menu.dishes, pg.start) &&
               <SectionHead title={contSectionOf(menu.dishes, pg.start) + " (segue)"} variant="t" takeaway={secMeta(menu, contSectionOf(menu.dishes, pg.start)).takeaway} />}
@@ -909,14 +929,14 @@ function MenuTabula({ menu, client }) {
               return (
                 <React.Fragment key={i}>
                   {idx > 0 && areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && areaOf(menu.dishes[i]) &&
-                    <AreaBand name={areaOf(menu.dishes[i])} inline />}
+                    <AreaBand name={areaOf(menu.dishes[i])} note={(((menu.areaMeta || {})[areaOf(menu.dishes[i])] || {}).note)} inline />}
                   {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="t" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                   <div className="tab-dish" data-di={i}>
                     <h3 className="tab-dish-name">
                       {d.name || <span className="placeholder-m">Nome del piatto</span>}
                       <DishPrice value={d.price} />
                       <AllergensInline list={d.allergens} />
-                      <TakeawayTag on={d.takeaway} />
+                      <DishMark n={d.mark} /><TakeawayTag on={d.takeaway} />
                     </h3>
                     {d.desc && <div className="tab-dish-desc">{d.desc}</div>}
                     {idx < pg.items.length - 1 && !startsSection(menu.dishes, i + 1) && <div className="tab-sep"></div>}
@@ -993,14 +1013,14 @@ function MenuEditoriale({ menu, client }) {
             <span className="ed-page-folio">{folio(pIdx + 2, pages.length + 1)}</span>
           </div>
 
-          {opensArea(menu.dishes, group.start) && areaOf(menu.dishes[group.start]) && <AreaBand name={areaOf(menu.dishes[group.start])} />}
+          {opensArea(menu.dishes, group.start) && areaOf(menu.dishes[group.start]) && <AreaBand name={areaOf(menu.dishes[group.start])} note={(((menu.areaMeta || {})[areaOf(menu.dishes[group.start])] || {}).note)} />}
           <div className="ed-page-body">
             {group.items.map((d, idx) => {
               const i = group.start + idx;
               return (
                 <React.Fragment key={i}>
                 {idx > 0 && areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && areaOf(menu.dishes[i]) &&
-                    <AreaBand name={areaOf(menu.dishes[i])} inline />}
+                    <AreaBand name={areaOf(menu.dishes[i])} note={(((menu.areaMeta || {})[areaOf(menu.dishes[i])] || {}).note)} inline />}
                   {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="ed" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                 <article className="ed-dish">
                   <DishImage
@@ -1014,7 +1034,7 @@ function MenuEditoriale({ menu, client }) {
                     <h3 className="ed-dish-name">
                       {d.name || <span className="placeholder-m">Nome del piatto</span>}
                       <DishPrice value={d.price} />
-                      <TakeawayTag on={d.takeaway} />
+                      <DishMark n={d.mark} /><TakeawayTag on={d.takeaway} />
                     </h3>
                     {d.desc && <p className="ed-dish-desc">{d.desc}</p>}
                     {d.story && (
@@ -1105,7 +1125,7 @@ function MenuDiario({ menu, client }) {
             <span className="dr-page-folio">{folio(pIdx + 2, pages.length + 1)}</span>
           </div>
 
-          {opensArea(menu.dishes, group.start) && areaOf(menu.dishes[group.start]) && <AreaBand name={areaOf(menu.dishes[group.start])} />}
+          {opensArea(menu.dishes, group.start) && areaOf(menu.dishes[group.start]) && <AreaBand name={areaOf(menu.dishes[group.start])} note={(((menu.areaMeta || {})[areaOf(menu.dishes[group.start])] || {}).note)} />}
           <div className="dr-entries" data-fitbox>
             {contSectionOf(menu.dishes, group.start) &&
               <SectionHead title={contSectionOf(menu.dishes, group.start) + " (segue)"} variant="dr" takeaway={secMeta(menu, contSectionOf(menu.dishes, group.start)).takeaway} />}
@@ -1114,7 +1134,7 @@ function MenuDiario({ menu, client }) {
               return (
                 <React.Fragment key={i}>
                 {idx > 0 && areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && areaOf(menu.dishes[i]) &&
-                    <AreaBand name={areaOf(menu.dishes[i])} inline />}
+                    <AreaBand name={areaOf(menu.dishes[i])} note={(((menu.areaMeta || {})[areaOf(menu.dishes[i])] || {}).note)} inline />}
                   {startsSection(menu.dishes, i) && <SectionHead title={d.section} variant="dr" divider={secMeta(menu, d.section).divider} takeaway={secMeta(menu, d.section).takeaway} />}
                 <article className="dr-entry" data-di={i}>
                   <div className="dr-entry-num">{courseNumber(i)}</div>
@@ -1123,7 +1143,7 @@ function MenuDiario({ menu, client }) {
                       {d.name || <span className="placeholder-m">Nome del piatto</span>}
                       <DishPrice value={d.price} />
                       <AllergensInline list={d.allergens} />
-                      <TakeawayTag on={d.takeaway} />
+                      <DishMark n={d.mark} /><TakeawayTag on={d.takeaway} />
                     </h3>
                     {d.desc && <p className="dr-entry-desc">{d.desc}</p>}
                     {d.story && <p className="dr-entry-story">{d.story}</p>}
@@ -1198,11 +1218,11 @@ function MenuListino({ menu, client }) {
             </span>
           </div>
 
-          {opensArea(menu.dishes, pg.start) && areaOf(menu.dishes[pg.start]) && <AreaBand name={areaOf(menu.dishes[pg.start])} />}
+          {opensArea(menu.dishes, pg.start) && areaOf(menu.dishes[pg.start]) && <AreaBand name={areaOf(menu.dishes[pg.start])} note={(((menu.areaMeta || {})[areaOf(menu.dishes[pg.start])] || {}).note)} />}
           <div className="lst-body" data-fitbox style={{ columnCount: colsAt(pg.start) }}>
             {groupsFor(pg).map((g, gi) => (
               <React.Fragment key={gi}>
-              {g.areaStart && <AreaBand name={g.areaStart} inline />}
+              {g.areaStart && <AreaBand name={g.areaStart} note={(((menu.areaMeta || {})[g.areaStart] || {}).note)} inline />}
               <section className="lst-group">
                 {g.section && (
                   <div className={"lst-sec" + (secMeta(menu, g.section).takeaway ? " lst-sec-takeaway" : "")} data-fithead>
@@ -1218,7 +1238,7 @@ function MenuListino({ menu, client }) {
                         {d.name || "—"}
                         {d.allergens && d.allergens.length > 0 &&
                           <span className="lst-allg"> ({[...d.allergens].sort((a, b) => a - b).join("·")})</span>}
-                        <TakeawayTag on={d.takeaway} />
+                        <DishMark n={d.mark} /><TakeawayTag on={d.takeaway} />
                       </span>
                       <DishPrice value={d.price} />
                     </div>
@@ -1232,6 +1252,7 @@ function MenuListino({ menu, client }) {
 
           {pi === pages.length - 1 && (
             <div className="lst-foot">
+              <MarksLegend menu={menu} className="lst-marks" />
               <AllergensLegend className="lst-legend" />
             </div>
           )}
@@ -1255,7 +1276,7 @@ function romanize(n){
 Object.assign(window, {
   MenuClassico, MenuContemporaneo, MenuTabula, MenuEditoriale, MenuDiario, MenuListino,
   Brand, DishPrice, CoastWave, Citrus, Draggable, DragCtx,
-  formatDate, formatPrice, ALLERGENI, secMeta, areaOf, areaGroups, areaSettings,
+  formatDate, formatPrice, ALLERGENI, secMeta, areaOf, areaGroups, areaSettings, DishMark, MarksLegend,
   GRID_DEFAULTS, gridOf, paginateDishes, WEIGHTS, colStyle, sectionGroups,
   FREE_BLOCKS, tagFreeBlocks, applyFreeLayout, installFreeDrag
 });

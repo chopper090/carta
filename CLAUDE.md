@@ -48,6 +48,11 @@ selezione multipla e trascinamento a eventi puntatore (mouse + tocco).
 Cambiare sezione a una voce la **sposta davvero** (`moveDishToSection`), non
 la rietichetta sul posto. `moveDishEdge` = in cima/in fondo alla sezione.
 
+**Asterischi e note.** `dish.mark` (0/1/2) stampa `*` / `**` accanto al nome;
+`menu.markNotes = { one, two }` sono le diciture, in fondo al menù solo se usate
+(`MarksLegend`). `areaMeta[nome].note` = riga esplicativa sotto la banda della
+macroarea (il "disclaimer" delle due offerte).
+
 **Sezioni.** `menu.sectionMeta[nome] = { divider, takeaway }` — separatore arancione
 prima della sezione e marchio "asporto". Sul piatto: `takeaway: true` mostra
 l'etichetta arancione. Dal form si rinomina la sezione (propaga a tutte le sue

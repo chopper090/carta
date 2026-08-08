@@ -335,11 +335,12 @@ function App(){
 
   // ---- actions ----
   const loadPreset = (key) => {
-    if (PRESET_MENUS[key]) setMenu(JSON.parse(JSON.stringify(PRESET_MENUS[key])));
+    // normalizeMenu → i preset ricevono tutti i campi predefiniti
+    if (PRESET_MENUS[key]) setMenu(normalizeMenu(JSON.parse(JSON.stringify(PRESET_MENUS[key]))));
   };
   const resetMenu = () => {
     if (confirm("Sostituire il menù corrente con un menu vuoto?")){
-      setMenu(JSON.parse(JSON.stringify(EMPTY_MENU)));
+      setMenu(normalizeMenu(JSON.parse(JSON.stringify(EMPTY_MENU))));
     }
   };
   const exportMenu = async (kind) => {
