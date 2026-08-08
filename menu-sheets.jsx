@@ -407,13 +407,18 @@ function useFittedPages(basePages, dishes, breakAt, enabled, sig, colsAt){
   const rootRef = useRef(null);
   const [starts, setStarts] = useState(() => basePages.map(p => p.start));
   const phase = useRef(0);               // 0 = da misurare, 1+ = verifiche
+  const settled = useRef(false);         // impaginazione stabile: non rimisurare più
   const lastSig = useRef(sig);
 
   if (lastSig.current !== sig){          // input cambiati → riparti pulito
     lastSig.current = sig;
     phase.current = 0;
+    settled.current = false;
   }
-  useLayoutEffect(() => { phase.current = 0; setStarts(basePages.map(p => p.start)); }, [sig]);
+  useLayoutEffect(() => {
+    phase.current = 0; settled.current = false;
+    setStarts(basePages.map(p => p.start));
+  }, [sig]);
 
   useLayoutEffect(() => {
     if (!enabled) return;
@@ -463,8 +468,12 @@ function useFittedPages(basePages, dishes, breakAt, enabled, sig, colsAt){
 
     // ---- FASE 1+: rete di sicurezza. Se per arrotondamenti una pagina
     // sborda ancora (es. l'ultima con la legenda), sposta avanti l'eccesso.
-    if (phase.current > 8 || boxes.length !== starts.length) return;
-    const over = (b) => (b.scrollHeight > b.clientHeight + 1) || (b.scrollWidth > b.clientWidth + 1);
+    if (settled.current || phase.current > 8 || boxes.length !== starts.length) return;
+    // Un blocco spostato a mano (modalità libera) allarga l'area di
+    // scorrimento pur non occupando spazio nel flusso: non è uno sbordo.
+    const handPlaced = (b) => !!b.querySelector('[data-free-id][style*="translate"]');
+    const over = (b) => !handPlaced(b) &&
+      ((b.scrollHeight > b.clientHeight + 1) || (b.scrollWidth > b.clientWidth + 1));
     const endOf = (arr, i) => (i + 1 < arr.length ? arr[i + 1] : N);
     const next = starts.slice();
     let changed = false;
@@ -479,6 +488,7 @@ function useFittedPages(basePages, dishes, breakAt, enabled, sig, colsAt){
       }
     }
     if (changed){ phase.current += 1; setStarts(next); }
+    else settled.current = true;        // stabile: basta misurare
   });
 
   const pages = starts.map((s, i) => ({
@@ -532,8 +542,8 @@ const WaveRule = () => (
 
 // Separatore ondulato a tutta pagina che apre una macroarea (col suo nome).
 const AreaBand = ({ name, note, inline }) => (
-  <div className={"area-band-wrap" + (inline ? " area-band-inline" : "")} data-fithead>
-    <div className="area-band">
+  <div className={"area-band" + (inline ? " area-band-inline" : "")} data-fithead>
+    <div className="area-band-row">
       <WaveRule />
       {name ? <span className="area-band-name">{name}</span> : null}
       {name ? <WaveRule /> : null}
