@@ -494,6 +494,22 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
           </div>
         </div>
 
+        <div className="pp-sublabel">Corpo del testo</div>
+        <div className="pp-pick">
+          <button type="button" className="pp-auto"
+            onClick={() => setGrid({ fontScale: 1 })}
+            title="Torna alla dimensione originale">100%</button>
+          <div className="pp-step">
+            <button type="button" aria-label="Testo più piccolo"
+              onClick={() => setGrid({ fontScale: Math.max(0.6, Math.round(((grid.fontScale || 1) - 0.05) * 100) / 100) })}
+              disabled={(grid.fontScale || 1) <= 0.6}>A−</button>
+            <span className="pp-val">{Math.round((grid.fontScale || 1) * 100)}%</span>
+            <button type="button" aria-label="Testo più grande"
+              onClick={() => setGrid({ fontScale: Math.min(2, Math.round(((grid.fontScale || 1) + 0.05) * 100) / 100) })}
+              disabled={(grid.fontScale || 1) >= 2}>A+</button>
+          </div>
+        </div>
+
         <div className="pp-sublabel">Sezioni</div>
         <button type="button"
           className={"section-break-toggle " + (grid.sectionBreak ? "active" : "")}
@@ -509,6 +525,7 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
             : ""}
           Con <strong>Auto</strong> le pagine A4 si creano da sole in base al contenuto — nessun limite.
           Imposta un numero per fissare quante voci stanno in ogni pagina.
+          {" "}Cambiando il <strong>corpo del testo</strong> le pagine si ricalcolano da sole.
           {" "}Con <strong>«sezione su pagina nuova»</strong> ogni sezione ricomincia da un foglio pulito.
         </p>
       </div>
