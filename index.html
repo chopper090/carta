@@ -520,6 +520,30 @@ html,body{background:#fff;height:auto;overflow:auto;margin:0}
 .app{display:block;width:auto;height:auto}
 .sheet{transform:none!important;gap:24px;padding:24px 0}
 .page-A4{margin:0 auto;box-shadow:0 8px 24px rgba(0,0,0,.12)}
+
+/* --- lettura da smartphone (QR): il foglio A4 diventa fluido --- */
+@media screen and (max-width:820px){
+  html{-webkit-text-size-adjust:100%}
+  .sheet{gap:0;padding:0}
+  .page-A4{
+    width:auto!important;max-width:100%;height:auto!important;min-height:0!important;
+    box-shadow:none;border:none;margin:0;overflow:visible!important;--fs:1.45;
+  }
+  /* niente colonne su schermo stretto: si legge scorrendo */
+  .lst-body,.dishes-c,.dishes-m,.tab-dishes,.page-A4 [style*="column-count"]{
+    column-count:1!important;columns:auto!important;
+  }
+  /* le posizioni fatte a mano valgono per l'A4, non per il telefono */
+  .page-A4 [data-free-id]{transform:none!important;font-size:inherit!important}
+  .inner-page-c,.inner-page-m,.tabula-page,.ed-page,.dr-page,.lst-page{
+    padding:16px 14px!important;display:block!important;height:auto!important;
+  }
+  .cover-page-c,.cover-page-m,.ed-cover,.dr-cover{padding:26px 16px!important;height:auto!important}
+  .area-band{margin-bottom:14px}
+  .lst-group{margin-bottom:14px}
+  .area-band-inline{column-span:none!important}
+}
+
 @media print{
   .sheet{gap:0;padding:0}
   .page-A4{box-shadow:none;border:none;margin:0 auto;break-after:page;page-break-after:always;break-inside:avoid;page-break-inside:avoid}

@@ -27,6 +27,14 @@ e calcola i salti pagina in un colpo solo — riempimento ~95%, nessun limite di
 pagine. `WEIGHTS`/`paginateDishes` restano solo come stima iniziale. Le colonne
 valgono sugli stili a lista (classico/contemporaneo/tabula/listino).
 
+**Corpo del testo.** `menu.grid[variante].fontScale` (0.6–2). Tutti i corpi del
+foglio sono `calc(Npt * var(--fs, 1))`; `--fs` è impostata inline sul `.sheet`.
+Entra in `fitSig` → cambiando la scala le pagine si ricalcolano da sole.
+
+**Lettura da smartphone.** L'export HTML porta un blocco `@media (max-width:820px)`:
+A4 fluido, colonna singola, `--fs:1.45`, posizioni della modalità libera
+neutralizzate. Su desktop resta l'A4 identico.
+
 **Modalità libera ("Canva").** `menu.layout[variante][id] = {x,y,s,h}` — sposta,
 ingrandisce e nasconde qualunque blocco (`FREE_BLOCKS`, `tagFreeBlocks`,
 `applyFreeLayout`, `installFreeDrag`). Stili inline → valgono anche in

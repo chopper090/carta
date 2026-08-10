@@ -281,7 +281,9 @@ const gridOf = (menu, variant) => {
   const cols = Math.max(1, Math.min(def.maxCols, g.cols || legacy || def.cols));
   const perPage = Math.max(0, (g.perPage === 0 || g.perPage) ? g.perPage : def.perPage);
   const sectionBreak = !!g.sectionBreak;   // ogni sezione parte da una pagina nuova
-  return { cols, perPage, maxCols: def.maxCols, sectionBreak };
+  // corpo del testo del foglio: 1 = come disegnato, 1.2 = 20% più grande
+  const fontScale = Math.max(0.6, Math.min(2, g.fontScale || 1));
+  return { cols, perPage, maxCols: def.maxCols, sectionBreak, fontScale };
 };
 
 // Stile per attivare le colonne CSS su un contenitore di piatti.
@@ -663,7 +665,7 @@ function MenuClassico({ menu, client }) {
   const coast = C.decor === "coast";
   const portate = menu.dishes.length;
   const L = layoutOf(menu, "classico");
-  const { cols, perPage, sectionBreak } = gridOf(menu, "classico");
+  const { cols, perPage, sectionBreak, fontScale } = gridOf(menu, "classico");
     // impostazioni per indice: ogni macroarea ha le sue colonne / voci per pagina
   const AS = (i) => areaSettings(menu, "classico", areaOf(menu.dishes[i]));
   const colsAt = (i) => AS(i).cols;
@@ -673,9 +675,9 @@ function MenuClassico({ menu, client }) {
     (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
   const base = paginateDishes(menu.dishes, colsAt, perPageAt, WEIGHTS.classico, breakAt);
   const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
-    fitSig(C.id, "classico", JSON.stringify(menu.areaMeta || {}) + cols, perPage, sectionBreak, menu.dishes), colsAt);
+    fitSig(C.id + ":" + fontScale, "classico", JSON.stringify(menu.areaMeta || {}) + cols, perPage, sectionBreak, menu.dishes), colsAt);
   return (
-    <div className="sheet sheet-classico" data-client={C.id} data-screen-label="Menu Classico" ref={fitRef}>
+    <div className="sheet sheet-classico" data-client={C.id} data-screen-label="Menu Classico" style={{ "--fs": fontScale }} ref={fitRef}>
       <div className="page-A4 cover-page-c">
         {coast && <Citrus className="cover-citrus" />}
         <div className="cover-chef-c">{C.role} · {menu.chef}</div>
@@ -778,7 +780,7 @@ function MenuContemporaneo({ menu, client }) {
   const hasLogo = C.logo && C.logo.type === "image";
   const portate = menu.dishes.length;
   const L = layoutOf(menu, "contemporaneo");
-  const { cols, perPage, sectionBreak } = gridOf(menu, "contemporaneo");
+  const { cols, perPage, sectionBreak, fontScale } = gridOf(menu, "contemporaneo");
     // impostazioni per indice: ogni macroarea ha le sue colonne / voci per pagina
   const AS = (i) => areaSettings(menu, "contemporaneo", areaOf(menu.dishes[i]));
   const colsAt = (i) => AS(i).cols;
@@ -788,9 +790,9 @@ function MenuContemporaneo({ menu, client }) {
     (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
   const base = paginateDishes(menu.dishes, colsAt, perPageAt, WEIGHTS.contemporaneo, breakAt);
   const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
-    fitSig(C.id, "contemporaneo", JSON.stringify(menu.areaMeta || {}) + cols, perPage, sectionBreak, menu.dishes), colsAt);
+    fitSig(C.id + ":" + fontScale, "contemporaneo", JSON.stringify(menu.areaMeta || {}) + cols, perPage, sectionBreak, menu.dishes), colsAt);
   return (
-    <div className="sheet sheet-contemporaneo" data-client={C.id} data-screen-label="Menu Contemporaneo" ref={fitRef}>
+    <div className="sheet sheet-contemporaneo" data-client={C.id} data-screen-label="Menu Contemporaneo" style={{ "--fs": fontScale }} ref={fitRef}>
       <div className="page-A4 cover-page-m">
         {coast && <Citrus className="cover-citrus" />}
         <div className="cover-top-m">
@@ -889,7 +891,7 @@ function MenuTabula({ menu, client }) {
   const C = useClient(client);
   const coast = C.decor === "coast";
   const portate = menu.dishes.length;
-  const { cols, perPage, sectionBreak } = gridOf(menu, "tabula");
+  const { cols, perPage, sectionBreak, fontScale } = gridOf(menu, "tabula");
     // impostazioni per indice: ogni macroarea ha le sue colonne / voci per pagina
   const AS = (i) => areaSettings(menu, "tabula", areaOf(menu.dishes[i]));
   const colsAt = (i) => AS(i).cols;
@@ -899,9 +901,9 @@ function MenuTabula({ menu, client }) {
     (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
   const base = paginateDishes(menu.dishes, colsAt, perPageAt, WEIGHTS.tabula, breakAt);
   const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
-    fitSig(C.id, "tabula", JSON.stringify(menu.areaMeta || {}) + cols, perPage, sectionBreak, menu.dishes), colsAt);
+    fitSig(C.id + ":" + fontScale, "tabula", JSON.stringify(menu.areaMeta || {}) + cols, perPage, sectionBreak, menu.dishes), colsAt);
   return (
-    <div className="sheet sheet-tabula" data-client={C.id} data-screen-label="Menu Tabula" ref={fitRef}>
+    <div className="sheet sheet-tabula" data-client={C.id} data-screen-label="Menu Tabula" style={{ "--fs": fontScale }} ref={fitRef}>
       {pages.map((pg, pi) => (
         <div className={"page-A4 tabula-page" + (pi === 0 ? "" : " tabula-page-cont")} key={pi}>
           <div className="tab-head">
@@ -973,7 +975,7 @@ function MenuEditoriale({ menu, client }) {
   const C = useClient(client);
   const portate = menu.dishes.length;
   // Voci per pagina configurabili (default 2). Le pagine si creano da sole.
-  const { perPage, sectionBreak } = gridOf(menu, "editoriale");
+  const { perPage, sectionBreak, fontScale } = gridOf(menu, "editoriale");
   const AS = (i) => areaSettings(menu, "editoriale", areaOf(menu.dishes[i]));
   const breakAt = (i) =>
     (areaOf(menu.dishes[i]) !== areaOf(menu.dishes[i - 1]) && !AS(i).samePage) ||
@@ -984,7 +986,7 @@ function MenuEditoriale({ menu, client }) {
   const heroSrc = menu.dishes.find(d => d.image)?.image || null;
 
   return (
-    <div className="sheet sheet-editoriale" data-client={C.id} data-screen-label="Menu Editoriale">
+    <div className="sheet sheet-editoriale" data-client={C.id} data-screen-label="Menu Editoriale" style={{ "--fs": fontScale }}>
       {/* COVER */}
       <div className="page-A4 ed-cover">
         <DishImage
@@ -1085,7 +1087,7 @@ function MenuDiario({ menu, client }) {
   const C = useClient(client);
   const portate = menu.dishes.length;
   // Voci per pagina configurabili (default 3). Le pagine si creano da sole.
-  const { perPage, sectionBreak } = gridOf(menu, "diario");
+  const { perPage, sectionBreak, fontScale } = gridOf(menu, "diario");
     // impostazioni per indice: ogni macroarea ha le sue colonne / voci per pagina
   const AS = (i) => areaSettings(menu, "diario", areaOf(menu.dishes[i]));
   const colsAt = (i) => 1;
@@ -1095,10 +1097,10 @@ function MenuDiario({ menu, client }) {
     (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
   const base = paginateDishes(menu.dishes, colsAt, perPageAt, WEIGHTS.diario, breakAt);
   const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
-    fitSig(C.id, "diario", JSON.stringify(menu.areaMeta || {}) + 1, perPage, sectionBreak, menu.dishes), colsAt);
+    fitSig(C.id + ":" + fontScale, "diario", JSON.stringify(menu.areaMeta || {}) + 1, perPage, sectionBreak, menu.dishes), colsAt);
 
   return (
-    <div className="sheet sheet-diario" data-client={C.id} data-screen-label="Menu Diario" ref={fitRef}>
+    <div className="sheet sheet-diario" data-client={C.id} data-screen-label="Menu Diario" style={{ "--fs": fontScale }} ref={fitRef}>
       {/* COVER */}
       <div className="page-A4 dr-cover">
         <div className="dr-top">
@@ -1183,7 +1185,7 @@ function MenuDiario({ menu, client }) {
 function MenuListino({ menu, client }) {
   const C = useClient(client);
   const coast = C.decor === "coast";
-  const { cols, perPage, sectionBreak } = gridOf(menu, "listino");
+  const { cols, perPage, sectionBreak, fontScale } = gridOf(menu, "listino");
 
   // Impaginazione per indice (come le altre varianti) → in Auto le pagine
   // vengono poi riempite fino al bordo dalla misurazione reale.
@@ -1197,7 +1199,7 @@ function MenuListino({ menu, client }) {
     (sectionBreak && (menu.dishes[i].section || "") !== (menu.dishes[i - 1].section || ""));
   const base = paginateDishes(menu.dishes, colsAt, perPageAt, LST_W, breakAt);
   const [pages, fitRef] = useFittedPages(base, menu.dishes, breakAt, perPage === 0,
-    fitSig(C.id, "listino", JSON.stringify(menu.areaMeta || {}) + cols, perPage, sectionBreak, menu.dishes), colsAt);
+    fitSig(C.id + ":" + fontScale, "listino", JSON.stringify(menu.areaMeta || {}) + cols, perPage, sectionBreak, menu.dishes), colsAt);
 
   // Le voci di una pagina, raggruppate per sezione ("(segue)" se la sezione
   // arriva dalla pagina precedente).
@@ -1217,7 +1219,7 @@ function MenuListino({ menu, client }) {
   };
 
   return (
-    <div className="sheet sheet-listino" data-client={C.id} data-screen-label="Menu Listino" ref={fitRef}>
+    <div className="sheet sheet-listino" data-client={C.id} data-screen-label="Menu Listino" style={{ "--fs": fontScale }} ref={fitRef}>
       {pages.map((pg, pi) => (
         <div className="page-A4 lst-page" key={pi}>
           <div className="lst-head">
