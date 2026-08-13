@@ -55,6 +55,8 @@ if('serviceWorker' in navigator){
 
 <script src="clients.js"></script>
 <script src="menu-data.js"></script>
+<script src="cambusa-bridge.js"></script>
+<script src="sync.js"></script>
 <script type="text/babel" src="menu-sheets.jsx"></script>
 <script type="text/babel" src="menu-form.jsx"></script>
 
@@ -85,6 +87,13 @@ function loadVariantFor(clientId){
   return localStorage.getItem("variant." + clientId)
       || (clientId === "dalentini" && localStorage.getItem("dalentini.variant"))
       || "contemporaneo";
+}
+// Ogni scrittura passa di qui. Il localStorage resta la fonte — l'app funziona
+// identica offline e senza token — ma il sincronizzatore viene avvisato, così
+// la modifica raggiunge gli altri dispositivi senza che tu debba pensarci.
+function saveKey(key, value){
+  localStorage.setItem(key, value);
+  if (window.CartaSync) CartaSync.bump(key, value);
 }
 
 function App(){
@@ -140,14 +149,14 @@ function App(){
       window.removeEventListener("pointerup", onUp);
       if (el) el.classList.remove("dragging");
       document.body.classList.remove("split-dragging");
-      try { localStorage.setItem("ui.editorW", String(w)); } catch(err){}
+      try { saveKey("ui.editorW", String(w)); } catch(err){}
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   }, [editorW]);
   const resetSplit = () => {
     setEditorW(EDITOR_W_DEF);
-    try { localStorage.setItem("ui.editorW", String(EDITOR_W_DEF)); } catch(err){}
+    try { saveKey("ui.editorW", String(EDITOR_W_DEF)); } catch(err){}
   };
 
   const [zoom, setZoom] = useState(0.55);
@@ -162,13 +171,13 @@ function App(){
   const [mview, setMview] = useState("editor");
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    try { localStorage.setItem("ui.theme", theme); } catch(e){}
+    try { saveKey("ui.theme", theme); } catch(e){}
   }, [theme]);
 
   // ---- client: font + url + persistenza attivo ----
   useEffect(() => {
     applyClientFonts(client);
-    try{ localStorage.setItem("active.client", clientId); } catch(e){}
+    try{ saveKey("active.client", clientId); } catch(e){}
     try{
       const url = new URL(location.href);
       url.searchParams.set("client", clientId);
@@ -183,15 +192,39 @@ function App(){
   useEffect(() => {
     const t = setTimeout(() => {
       try{
-        localStorage.setItem("menu." + clientId, JSON.stringify(menu));
+        saveKey("menu." + clientId, JSON.stringify(menu));
         setSaveErr(false);
       } catch(e){ setSaveErr(true); }
     }, 400);
     return () => clearTimeout(t);
   }, [menu, clientId]);
   useEffect(() => {
-    try{ localStorage.setItem("variant." + clientId, variant); } catch(e){}
+    try{ saveKey("variant." + clientId, variant); } catch(e){}
   }, [variant, clientId]);
+
+  // ---- memoria condivisa fra dispositivi ----
+  // Quando arriva la memoria scritta altrove, il sincronizzatore ha già
+  // riscritto il localStorage: qui l'app rilegge sé stessa, senza ricaricare
+  // la pagina — niente lampo bianco e niente scroll perso.
+  const [syncState, setSyncState] = useState(() => window.CartaSync ? CartaSync.status() : null);
+  useEffect(() => {
+    if (!window.CartaSync) return;
+    const offState = CartaSync.onState(setSyncState);
+    const offApplied = CartaSync.onApplied(({ startup }) => {
+      // All'apertura si riprende dal cliente su cui eri sull'altro
+      // dispositivo; se invece scarichi a metà lavoro, resti dove sei.
+      const want = startup ? (localStorage.getItem("active.client") || clientId) : clientId;
+      const next = CLIENTS[want] ? want : clientId;
+      setMenu(loadMenuFor(next));
+      setVariant(loadVariantFor(next));
+      if (next !== clientId) setClientId(next);
+      const t = localStorage.getItem("ui.theme");
+      if (t === "light" || t === "dark") setTheme(t);
+      const w = parseInt(localStorage.getItem("ui.editorW") || "", 10);
+      if (w >= 260 && w <= 1200) setEditorW(w);
+    });
+    return () => { offState(); offApplied(); };
+  }, [clientId]);
 
   // ---- switch client → carica il suo menù + variante ----
   const switchClient = useCallback((id) => {
@@ -348,6 +381,21 @@ function App(){
     if (kind === "json"){
       const blob = new Blob([JSON.stringify(menu, null, 2)], { type: "application/json" });
       downloadBlob(blob, `${prefix}-${slug(menu.name)}.json`);
+    } else if (kind === "cambusa"){
+      // La fotografia parte dal disco, ma il cliente aperto lo prendiamo dalla
+      // memoria viva: l'export non deve mai essere vecchio di mezzo secondo.
+      const parts = {};
+      try{
+        for (let i = 0; i < localStorage.length; i++){
+          const k = localStorage.key(i);
+          if (k && k.indexOf("menu.") === 0) parts[k] = localStorage.getItem(k);
+        }
+      } catch(e){}
+      parts["menu." + clientId] = JSON.stringify(menu);
+      const data = CambusaBridge.build(parts);
+      if (!data){ alert("Non c'è ancora nessun menù da esportare."); return; }
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      downloadBlob(blob, `carta-per-cambusa-${new Date().toISOString().slice(0, 10)}.json`);
     } else if (kind === "html"){
       const html = await buildStandaloneHTML(menu, variant, clientId, previewRef.current);
       const blob = new Blob([html], { type: "text/html" });
@@ -430,6 +478,16 @@ function App(){
             <span className="ptb-warn" title="Spazio del browser esaurito: il menù non viene più salvato. Alleggerisci le foto o esporta in JSON.">
               ⚠ non salvato
             </span>
+          )}
+          {syncState && syncState.hasToken && (
+            <button
+              className={"ptb-theme ptb-sync " + (syncState.busy ? "busy" : syncState.error ? "err" : syncState.dirty ? "dirty" : "ok")}
+              onClick={() => { CartaSync.syncNow().catch(() => {}); }}
+              title={syncState.busy ? "Sincronizzazione in corso…"
+                : syncState.error ? "Sincronizzazione ferma — " + syncState.error
+                : syncState.dirty ? "Modifiche non ancora inviate · clicca per sincronizzare"
+                : "Memoria allineata su tutti i dispositivi"}
+              aria-label="Sincronizza la memoria">⇅</button>
           )}
           {hasLayout && (
             <button className="ptb-theme" onClick={resetLayout}

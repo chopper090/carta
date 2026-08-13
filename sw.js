@@ -2,10 +2,10 @@
 // Strategia: network-first per documenti e codice (così gli aggiornamenti
 // arrivano subito quando si è online), cache-first per immagini/font/icone.
 // Fallback offline alla cache, e a index.html per le navigazioni.
-const CACHE = 'carta-v1.11.0';
+const CACHE = 'carta-v1.12.0';
 const ASSETS = [
   './', './index.html',
-  './clients.js', './menu-data.js', './menu-sheets.jsx', './menu-form.jsx', './menu-generator.css',
+  './clients.js', './menu-data.js', './cambusa-bridge.js', './sync.js', './menu-sheets.jsx', './menu-form.jsx', './menu-generator.css',
   './icon-192.png', './icon-512.png', './icon-512-maskable.png', './manifest.webmanifest'
 ];
 

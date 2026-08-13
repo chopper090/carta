@@ -830,6 +830,9 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
         </p>
       </div>
 
+      <SyncPanel />
+      <CambusaPanel onExport={onExport} />
+
       <div className="form-foot">
         {C && C.id !== "dalentini"
           ? <a href="index.html#consulenza">← Consulenza</a>
@@ -837,6 +840,149 @@ function Form({ menu, setMenu, variant, setVariant, client, setClient, onLoadPre
         <span>v 1.2</span>
       </div>
     </aside>
+  );
+}
+
+// ============================================================
+// Memoria condivisa — il menù smette di essere prigioniero del browser in cui
+// l'hai scritto. Un Gist segreto del tuo account fa da archivio comune fra
+// notebook, telefono e app installata; è lo stesso di Cambusa, stesso token.
+// ============================================================
+function SyncPanel(){
+  const S = typeof window !== "undefined" ? window.CartaSync : null;
+  const [st, setSt] = React.useState(() => (S ? S.status() : null));
+  const [token, setToken] = React.useState("");
+  const [msg, setMsg] = React.useState("");
+  const [bad, setBad] = React.useState(false);
+  React.useEffect(() => { if (S) return S.onState(setSt); }, []);
+  if (!S || !st) return null;
+
+  const say = (t, isBad) => { setMsg(t); setBad(!!isBad); };
+  const when = (ms) => ms ? new Date(ms).toLocaleString("it-IT", {
+    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "mai";
+
+  const run = async (what) => {
+    try{
+      if (what === "save"){
+        if (!token.trim()) return say("Incolla prima il token.", true);
+        S.saveToken(token);
+        setToken("");
+        return say("Token salvato su questo dispositivo. Vale anche per Cambusa.");
+      }
+      if (what === "clear"){
+        S.clearToken();
+        return say("Token rimosso da Carta. Quello di Cambusa resta al suo posto.");
+      }
+      if (what === "verify"){
+        const u = await S.verify();
+        const scope = u.hasGist === true ? "permesso “gist” presente"
+          : u.hasGist === false ? "⚠ manca il permesso “gist”"
+          : "permessi non leggibili dal browser (normale)";
+        return say(`Token valido · account ${u.login} · ${scope}.`);
+      }
+      if (what === "push"){
+        await S.push();
+        return say("Memoria inviata: gli altri dispositivi la troveranno al prossimo avvio.");
+      }
+      if (what === "pull"){
+        if (!confirm("Scaricare la memoria dal cloud? I menù di questo dispositivo verranno sostituiti da quelli salvati altrove.")) return;
+        await S.pull(false);
+        return say("Memoria scaricata e applicata.");
+      }
+      if (what === "now"){
+        const r = await S.syncNow(false);
+        return say(r.pulled ? "Scaricata la versione più recente."
+          : r.created ? "Archivio creato: da adesso la memoria viaggia."
+          : r.pushed ? "Inviate le tue modifiche."
+          : "Già allineato.");
+      }
+    } catch(e){ say(e.message || String(e), true); }
+  };
+
+  const state = st.busy ? "Sincronizzo…"
+    : st.error ? "Ferma"
+    : !st.hasToken ? "Non configurata"
+    : st.dirty ? "Modifiche da inviare"
+    : !st.syncedUpdatedAt ? "Mai inviata"
+    : "Allineata";
+
+  return (
+    <div className="form-section">
+      <div className="section-label">Memoria condivisa fra dispositivi</div>
+      <p className="cols-hint sync-intro">
+        I menù vivono nel browser che li ha scritti: qui li depositi in un <strong>Gist segreto</strong>
+        {" "}del tuo account GitHub, e li ritrovi identici sul telefono, sull'app installata e su ogni altro PC.
+      </p>
+      <ol className="sync-steps">
+        <li>Crea un token <strong>classic</strong> su{" "}
+          <a href="https://github.com/settings/tokens/new?scopes=gist&description=Carta%20Sync"
+            target="_blank" rel="noopener">github.com/settings/tokens/new</a>{" "}
+          spuntando <strong>solo “gist”</strong>. I token “fine-grained” con i Gist non funzionano.</li>
+        <li>Incollalo qui sotto e premi <strong>Salva token</strong>.</li>
+        <li>Sul dispositivo che <strong>ha i dati buoni</strong> premi <strong>Invia</strong>. Sugli altri premi <strong>Scarica</strong>. Poi accendi l'automatico.</li>
+      </ol>
+
+      <label className="field field-wide">
+        <span className="field-label">Token GitHub {st.hasToken && <em className="field-flag">già salvato</em>}</span>
+        <input type="password" value={token} autoComplete="off" spellCheck="false"
+          placeholder={st.hasToken ? "•••••••• — incollane uno nuovo per sostituirlo" : "ghp_…"}
+          onChange={e => setToken(e.target.value)} />
+      </label>
+
+      <div className="sync-row">
+        <button className="secondary-btn" onClick={() => run("save")}>Salva token</button>
+        <button className="secondary-btn" onClick={() => run("verify")} disabled={!st.hasToken}>Verifica</button>
+        <button className="primary-btn" onClick={() => run("now")} disabled={!st.hasToken || st.busy}>⇅ Sincronizza ora</button>
+        <button className="secondary-btn" onClick={() => run("push")} disabled={!st.hasToken || st.busy}>Invia</button>
+        <button className="secondary-btn" onClick={() => run("pull")} disabled={!st.hasToken || st.busy}>Scarica</button>
+        <button className="secondary-btn sync-drop" onClick={() => run("clear")} disabled={!st.hasToken}>Rimuovi token</button>
+      </div>
+
+      <label className="sync-auto">
+        <input type="checkbox" checked={st.auto} disabled={!st.hasToken}
+          onChange={e => { S.cfg.auto = e.target.checked; setSt(S.status()); }} />
+        <span>Sincronizza da sola — all'apertura e dopo ogni modifica</span>
+      </label>
+
+      <p className={"sync-status" + (bad || st.error ? " bad" : "")}>
+        <strong>{state}</strong>
+        {st.hasToken && !!st.syncedUpdatedAt && <> · ultimo invio {when(st.syncedUpdatedAt)}</>}
+        {(msg || st.error) && <><br/>{msg || st.error}</>}
+      </p>
+      <p className="export-note">
+        Il token resta in questo browser e non finisce mai dentro l'archivio: puoi revocarlo
+        da GitHub in ogni momento. In caso di modifiche in contemporanea su due dispositivi
+        <strong> vince l'ultimo salvataggio</strong>.
+      </p>
+    </div>
+  );
+}
+
+// ============================================================
+// Ponte verso Cambusa — la carta diventa food cost.
+// ============================================================
+function CambusaPanel({ onExport }){
+  const sync = typeof window !== "undefined" ? window.CartaSync : null;
+  const armed = !!(sync && sync.status().hasToken);
+  return (
+    <div className="form-section">
+      <div className="section-label">Porta il menù in Cambusa</div>
+      <p className="cols-hint sync-intro">
+        Ogni voce diventa un piatto con il suo prezzo, e la descrizione viene sciolta nei
+        singoli ingredienti — pronti per il food cost. Gli allergeni che hai spuntato qui
+        restano quelli buoni: l'importazione non li perde mai.
+      </p>
+      <div className="sync-row">
+        <button className="primary-btn" onClick={() => onExport("cambusa")}>↓ File per Cambusa</button>
+      </div>
+      <p className="export-note">
+        {armed
+          ? <>Con la sincronizzazione accesa lo stesso file viaggia già nel Gist a ogni salvataggio:
+              Cambusa lo trova da sola, senza passare da qui.</>
+          : <>Configura la memoria condivisa qui sopra e questo stesso file finirà nel Gist a
+              ogni salvataggio, così Cambusa se lo prende da sola.</>}
+      </p>
+    </div>
   );
 }
 

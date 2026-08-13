@@ -9,6 +9,8 @@ stateful interdipendenti: Form + 5 "sheet"). Zero build. PWA (sw + manifest + `.
 
 **Mappa file.**
 - `index.html` — entry point = l'app (carica React/Babel + i sorgenti). Testa con anti-FOUC + SW.
+- `sync.js` — memoria condivisa fra dispositivi via Gist. `cambusa-bridge.js` — ponte verso Cambusa.
+- `tools/cambusa-import-carta.js` — modulo **per Cambusa** (non per Carta): legge il ponte.
 - `clients.js` — `CLIENTS` (demo, dalentini, baretto), `CLIENT_ORDER`, `DEFAULT_CLIENT="demo"`,
   `getClient`, `applyClientFonts`, `bookingLine`. Il logo baretto è un data-URL (`BARETTO_LOGO`).
 - `menu-data.js` — `ALLERGENI`, i preset (`MENU_DEMO`, `MENU_RADICI/SAKURA/TERRAEMARE` = DaLentini,
@@ -18,6 +20,24 @@ stateful interdipendenti: Form + 5 "sheet"). Zero build. PWA (sw + manifest + `.
 
 **Dove stanno i dati.** `localStorage`, **per-cliente**: `menu.<id>`, `variant.<id>`,
 `active.client`, `ui.theme`. Migrazione legacy dalla vecchia chiave `dalentini.menu`.
+
+**Memoria condivisa (`sync.js`).** Le stesse chiavi vivono anche in un **Gist segreto**
+(file `carta-backup.json`, cercato per nome: nessun id da copiare). Vince l'ultima modifica:
+pull all'apertura, push con 4 s di quiete dopo ogni modifica, o a mano dal pannello dell'editor.
+Token GitHub **classic** con solo `gist`, in `carta.sync.token` — mai dentro il backup. È lo
+stesso di Cambusa: se manca si legge `rm:v1:sync:token`, e salvandolo qui si scrive anche là.
+Ogni scrittura passa da `saveKey()` (index.html) → `CartaSync.bump(key, value)`; un pull emette
+`onApplied` e l'app rilegge sé stessa **senza ricaricare**.
+⚠️ Su Pages Carta e Cambusa condividono l'origin: `OWN` (in `sync.js`) elenca le chiavi di Carta
+una per una e niente fuori da lì viene mai letto o cancellato. E una modifica conta solo dopo
+un gesto vero dell'utente (`touched`), altrimenti il solo avvio farebbe vincere ogni dispositivo.
+
+**Ponte verso Cambusa (`cambusa-bridge.js`).** `desc` viene sciolta nei singoli ingredienti
+(virgole di primo livello: quelle dentro le parentesi restano intatte) e gli allergeni 1-14
+diventano nomi — stesso ordine di legge nelle due app, corrispondenza posizionale. Il file
+`carta-to-cambusa.json` (un blocco per cliente) viene scaricato dal pannello **e** pubblicato
+nel Gist a ogni push. Allergeni del piatto = quelli spuntati in Carta e fanno fede; quelli per
+ingrediente sono dedotti dal nome con un dizionario, quindi indicativi.
 
 **Impaginazione.** `menu.grid[variante] = { cols, perPage, sectionBreak, free }`
 (`perPage:0` = auto; `sectionBreak` = ogni sezione parte da una pagina nuova).
